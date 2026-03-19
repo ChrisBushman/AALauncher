@@ -1,2 +1,35 @@
-/.cproject
-/.project
+# CMake build output
+build/
+cmake-build-*/
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+
+# Windows build output (MSVC)
+AALauncher/Debug/
+AALauncher/Release/
+AALauncher/x64/
+AALauncher/Win32/
+*.user
+*.suo
+*.ncb
+*.aps
+*.pdb
+*.ilk
+*.exp
+*.lib
+*.obj
+*.exe
+*.dll
+
+# macOS
+.DS_Store
+*.dSYM/
+
+# Eclipse
+.cproject
+.project
+
+.vscode/
+.claude/
+spec/
