@@ -15,6 +15,7 @@ jobs:
           /p:Platform=Win32
           /p:PlatformToolset=v143
           /p:TargetFrameworkVersion=v4.8
+          /p:CLRSupport=true
       - name: Locate build output
         shell: bash
         run: |
