@@ -8,6 +8,7 @@
 #include <QFont>
 #include <QMessageBox>
 #include <QProcess>
+#include <QProcessEnvironment>
 #include <QUrl>
 #include <QVBoxLayout>
 #include <QWidget>
@@ -73,11 +74,28 @@ void MainWindow::setupUi()
 bool MainWindow::launchProcess(const QString &binaryPath, const QStringList &args)
 {
     QString workDir = QFileInfo(binaryPath).absolutePath();
-    bool ok = QProcess::startDetached(binaryPath, args, workDir);
+
+    /* AA/AAServer link against bundled SDL dylibs by absolute build-time
+       path (see their own run.sh wrappers); dyld only finds them via
+       DYLD_LIBRARY_PATH pointed at the lib/ folder shipped alongside each
+       binary, since we're exec'ing them directly rather than through a
+       shell wrapper. */
+    QProcessEnvironment env = QProcessEnvironment::systemEnvironment();
+    QString libDir = workDir + QDir::separator() + "lib";
+    QString existing = env.value("DYLD_LIBRARY_PATH");
+    env.insert("DYLD_LIBRARY_PATH", existing.isEmpty() ? libDir : libDir + ":" + existing);
+
+    QProcess *process = new QProcess(this);
+    process->setProgram(binaryPath);
+    process->setArguments(args);
+    process->setWorkingDirectory(workDir);
+    process->setProcessEnvironment(env);
+    bool ok = process->startDetached();
     if (!ok) {
         QMessageBox::critical(this, "Launch Error",
             QString("Failed to launch: %1").arg(binaryPath));
     }
+    process->deleteLater();
     return ok;
 }
 

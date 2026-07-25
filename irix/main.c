@@ -97,8 +97,35 @@ static void LaunchProcess(const char *binaryPath, char *const argv[])
     if (pid == 0)  {
         /* Child: detach into its own session so it survives the
            launcher exiting, then exec. */
+        /* Static: putenv() keeps a pointer to this string, not a copy, and
+           must stay valid through execv(). No setenv() on this IRIX libc. */
+        static char n32Buf[2048];
+        static char plainBuf[2048];
+        char libPath[1024];
+        char *existingN32 = getenv("LD_LIBRARYN32_PATH");
+        char *existing = getenv("LD_LIBRARY_PATH");
+
         setsid();
         chdir(G_selfDir);
+
+        /* AA/AAServer link against bundled SDL libs shipped in a lib/
+           folder alongside each binary (see their own run.sh wrappers);
+           N32 binaries only find them via LD_LIBRARYN32_PATH (and plain
+           LD_LIBRARY_PATH as a fallback) since we're exec'ing them
+           directly rather than through a shell wrapper. */
+        sprintf(libPath, "%s/lib", G_selfDir);
+        if (existingN32 && existingN32[0])
+            sprintf(n32Buf, "LD_LIBRARYN32_PATH=%s:%s:/usr/nekoware/lib:/usr/tgcware/lib", libPath, existingN32);
+        else
+            sprintf(n32Buf, "LD_LIBRARYN32_PATH=%s:/usr/nekoware/lib:/usr/tgcware/lib", libPath);
+        putenv(n32Buf);
+
+        if (existing && existing[0])
+            sprintf(plainBuf, "LD_LIBRARY_PATH=%s:%s:/usr/nekoware/lib:/usr/tgcware/lib", libPath, existing);
+        else
+            sprintf(plainBuf, "LD_LIBRARY_PATH=%s:/usr/nekoware/lib:/usr/tgcware/lib", libPath);
+        putenv(plainBuf);
+
         execv(binaryPath, argv);
         /* execv only returns on failure. */
         _exit(127);

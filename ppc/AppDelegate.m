@@ -99,7 +99,21 @@ static NSString *DefaultBinary(NSString *name)
     NSTask *task = [[[NSTask alloc] init] autorelease];
     [task setLaunchPath:binaryPath];
     [task setArguments:args];
-    [task setCurrentDirectoryPath:[binaryPath stringByDeletingLastPathComponent]];
+    NSString *workDir = [binaryPath stringByDeletingLastPathComponent];
+    [task setCurrentDirectoryPath:workDir];
+
+    /* AA/AAServer link against bundled SDL dylibs by absolute build-time
+       path (see their own run.sh wrappers); dyld only finds them via
+       DYLD_LIBRARY_PATH pointed at the lib/ folder shipped alongside each
+       binary, since we're exec'ing them directly rather than through a
+       shell wrapper. */
+    NSMutableDictionary *env = [[[NSMutableDictionary alloc] initWithDictionary:[[NSProcessInfo processInfo] environment]] autorelease];
+    NSString *libDir = [workDir stringByAppendingPathComponent:@"lib"];
+    NSString *existing = [env objectForKey:@"DYLD_LIBRARY_PATH"];
+    NSString *combined = [existing length] ? [NSString stringWithFormat:@"%@:%@", libDir, existing] : libDir;
+    [env setObject:combined forKey:@"DYLD_LIBRARY_PATH"];
+    [task setEnvironment:env];
+
     @try  {
         [task launch];
     }
