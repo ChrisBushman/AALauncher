@@ -1,0 +1,25 @@
+name: Windows release build
+on:
+  workflow_dispatch:
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Add MSBuild to PATH
+        uses: microsoft/setup-msbuild@v2
+      - name: Build AALauncher.exe (Release|Win32)
+        run: >
+          msbuild AALauncher/AALauncher.sln
+          /p:Configuration=Release
+          /p:Platform=Win32
+          /p:PlatformToolset=v143
+      - name: Locate build output
+        shell: bash
+        run: |
+          find AALauncher -iname 'AALauncher.exe'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: AALauncher-windows
+          path: AALauncher/Release/AALauncher.exe
+          if-no-files-found: error
