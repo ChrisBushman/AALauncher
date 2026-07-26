@@ -20,7 +20,7 @@ int main(int argc, char *argv[])
         "Full path to the AAServer binary (default: AAServer alongside launcher).",
         "path");
     QCommandLineOption portOpt("port",
-        "IPX UDP port for server and client (default: 213).",
+        "IPX UDP port for server and client (default: 21300).",
         "port");
 
     parser.addOption(aaPathOpt);
