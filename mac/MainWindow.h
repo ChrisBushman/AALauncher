@@ -2,7 +2,10 @@
 
 #include <QMainWindow>
 #include <QWebEngineView>
+#include <QLineEdit>
 #include <QPushButton>
+
+class ScriptCompilerWindow;
 
 class MainWindow : public QMainWindow
 {
@@ -11,6 +14,7 @@ class MainWindow : public QMainWindow
 public:
     explicit MainWindow(const QString &aaPath = {},
                         const QString &serverPath = {},
+                        const QString &scriptCompilerPath = {},
                         const QString &port = {},
                         QWidget *parent = nullptr);
     ~MainWindow() override = default;
@@ -19,6 +23,7 @@ private slots:
     void onStartServer();
     void onPlayNetwork();
     void onPlaySinglePlayer();
+    void onScriptCompiler();
 
 private:
     void setupUi();
@@ -26,9 +31,13 @@ private:
 
     QString         m_aaBinary;
     QString         m_serverBinary;
-    QString         m_port;
+    QString         m_scriptCompilerBinary;
     QWebEngineView *m_webView    = nullptr;
     QPushButton    *m_btnServer  = nullptr;
     QPushButton    *m_btnNetwork = nullptr;
     QPushButton    *m_btnSingle  = nullptr;
+    QPushButton    *m_btnScriptCompiler = nullptr;
+    QPushButton    *m_btnExit    = nullptr;
+    QLineEdit      *m_portEdit   = nullptr;
+    ScriptCompilerWindow *m_scriptCompilerWindow = nullptr;
 };

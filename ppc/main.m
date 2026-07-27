@@ -22,12 +22,14 @@ int main(int argc, const char *argv[])
 
     NSString *aaPath = ArgValue(args, @"--aa-path");
     NSString *serverPath = ArgValue(args, @"--server-path");
+    NSString *scriptCompilerPath = ArgValue(args, @"--script-compiler-path");
     NSString *port = ArgValue(args, @"--port");
 
     [NSApplication sharedApplication];
 
     AppDelegate *delegate = [[AppDelegate alloc] initWithAABinary:aaPath
                                                       serverBinary:serverPath
+                                              scriptCompilerBinary:scriptCompilerPath
                                                               port:port];
     [NSApp setDelegate:delegate];
     [NSApp run];

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "NetworkIP.h"
+#include "ScriptCompilerForm.h"
 #include <stdlib.h>
 #include <Windows.h>
 #include <ShellAPI.h>
@@ -14,6 +15,7 @@ namespace AALauncher {
 	using namespace System::Data;
 	using namespace System::Drawing;
     using namespace System::Runtime::InteropServices;
+    using namespace System::IO;
 
 	/// <summary>
 	/// Summary for Form1
@@ -50,8 +52,14 @@ namespace AALauncher {
 
 
     private: System::Windows::Forms::Button^  StartServerButton;
+    private: System::Windows::Forms::Label^   PortLabel;
+    private: System::Windows::Forms::TextBox^ PortTextBox;
+    private: System::Windows::Forms::Button^  ScriptCompilerButton;
+    private: System::Windows::Forms::Button^  ExitButton;
 
     private: System::Windows::Forms::WebBrowser^  webBrowser1;
+
+    private: ScriptCompilerForm^ scriptCompilerForm;
 
 
 	private:
@@ -71,19 +79,27 @@ namespace AALauncher {
             this->PlayNetworkGame = (gcnew System::Windows::Forms::Button());
             this->PlaySinglePlayer = (gcnew System::Windows::Forms::Button());
             this->StartServerButton = (gcnew System::Windows::Forms::Button());
+            this->PortLabel = (gcnew System::Windows::Forms::Label());
+            this->PortTextBox = (gcnew System::Windows::Forms::TextBox());
+            this->ScriptCompilerButton = (gcnew System::Windows::Forms::Button());
+            this->ExitButton = (gcnew System::Windows::Forms::Button());
             this->webBrowser1 = (gcnew System::Windows::Forms::WebBrowser());
             this->panel1->SuspendLayout();
             this->SuspendLayout();
-            // 
+            //
             // panel1
-            // 
+            //
             this->panel1->Controls->Add(this->PlayNetworkGame);
             this->panel1->Controls->Add(this->PlaySinglePlayer);
             this->panel1->Controls->Add(this->StartServerButton);
+            this->panel1->Controls->Add(this->PortLabel);
+            this->panel1->Controls->Add(this->PortTextBox);
+            this->panel1->Controls->Add(this->ScriptCompilerButton);
+            this->panel1->Controls->Add(this->ExitButton);
             this->panel1->Dock = System::Windows::Forms::DockStyle::Bottom;
             this->panel1->Location = System::Drawing::Point(0, 462);
             this->panel1->Name = L"panel1";
-            this->panel1->Size = System::Drawing::Size(1049, 100);
+            this->panel1->Size = System::Drawing::Size(1049, 160);
             this->panel1->TabIndex = 0;
             // 
             // PlayNetworkGame
@@ -121,9 +137,49 @@ namespace AALauncher {
             this->StartServerButton->Text = L"Start A&&A &Server";
             this->StartServerButton->UseVisualStyleBackColor = true;
             this->StartServerButton->Click += gcnew System::EventHandler(this, &Form1::button1_Click);
-            // 
+            //
+            // PortLabel
+            //
+            this->PortLabel->AutoSize = true;
+            this->PortLabel->Location = System::Drawing::Point(148, 103);
+            this->PortLabel->Name = L"PortLabel";
+            this->PortLabel->Size = System::Drawing::Size(70, 13);
+            this->PortLabel->Text = L"Server Port:";
+            //
+            // PortTextBox
+            //
+            this->PortTextBox->Location = System::Drawing::Point(228, 100);
+            this->PortTextBox->Name = L"PortTextBox";
+            this->PortTextBox->Size = System::Drawing::Size(70, 20);
+            this->PortTextBox->TabIndex = 3;
+            this->PortTextBox->Text = L"21300";
+            //
+            // ScriptCompilerButton
+            //
+            this->ScriptCompilerButton->Font = (gcnew System::Drawing::Font(L"Microsoft Sans Serif", 8.25F, System::Drawing::FontStyle::Bold, System::Drawing::GraphicsUnit::Point,
+                static_cast<System::Byte>(0)));
+            this->ScriptCompilerButton->Location = System::Drawing::Point(406, 92);
+            this->ScriptCompilerButton->Name = L"ScriptCompilerButton";
+            this->ScriptCompilerButton->Size = System::Drawing::Size(234, 40);
+            this->ScriptCompilerButton->TabIndex = 4;
+            this->ScriptCompilerButton->Text = L"Script Compiler";
+            this->ScriptCompilerButton->UseVisualStyleBackColor = true;
+            this->ScriptCompilerButton->Click += gcnew System::EventHandler(this, &Form1::scriptCompilerButton_Click);
+            //
+            // ExitButton
+            //
+            this->ExitButton->Font = (gcnew System::Drawing::Font(L"Microsoft Sans Serif", 8.25F, System::Drawing::FontStyle::Bold, System::Drawing::GraphicsUnit::Point,
+                static_cast<System::Byte>(0)));
+            this->ExitButton->Location = System::Drawing::Point(665, 92);
+            this->ExitButton->Name = L"ExitButton";
+            this->ExitButton->Size = System::Drawing::Size(234, 40);
+            this->ExitButton->TabIndex = 5;
+            this->ExitButton->Text = L"Exit";
+            this->ExitButton->UseVisualStyleBackColor = true;
+            this->ExitButton->Click += gcnew System::EventHandler(this, &Form1::exitButton_Click);
+            //
             // webBrowser1
-            // 
+            //
             this->webBrowser1->Dock = System::Windows::Forms::DockStyle::Fill;
             this->webBrowser1->Location = System::Drawing::Point(0, 0);
             this->webBrowser1->MinimumSize = System::Drawing::Size(20, 20);
@@ -138,7 +194,7 @@ namespace AALauncher {
             this->AcceptButton = this->PlaySinglePlayer;
             this->AutoScaleDimensions = System::Drawing::SizeF(6, 13);
             this->AutoScaleMode = System::Windows::Forms::AutoScaleMode::Font;
-            this->ClientSize = System::Drawing::Size(1049, 562);
+            this->ClientSize = System::Drawing::Size(1049, 622);
             this->Controls->Add(this->webBrowser1);
             this->Controls->Add(this->panel1);
             this->Name = L"Form1";
@@ -151,14 +207,17 @@ namespace AALauncher {
         }
 #pragma endregion
     private: System::Void button1_Click(System::Object^  sender, System::EventArgs^  e) {
+             IntPtr p = Marshal::StringToHGlobalAnsi(PortTextBox->Text->Trim());
+             const char* pAnsi = static_cast<const char*>(p.ToPointer());
              HINSTANCE i = ShellExecute(
                 NULL,
                 "open",
                 "AAServer.exe",
-                NULL,
+                pAnsi,
                 NULL,
                 SW_SHOWNOACTIVATE
             );
+            Marshal::FreeHGlobal(p);
             if ((int)i < 32) {
                 MessageBox::Show("Failed to start server!");
              } else {
@@ -168,9 +227,10 @@ namespace AALauncher {
 private: System::Void label2_Click(System::Object^  sender, System::EventArgs^  e) {
          }
 private: System::Void button3_Click(System::Object^  sender, System::EventArgs^  e) {
-             NetworkIP ^ f = gcnew NetworkIP;
+             NetworkIP ^ f = gcnew NetworkIP(PortTextBox->Text->Trim());
              if (f->ShowDialog(this) == System::Windows::Forms::DialogResult::OK) {
-                IntPtr p = Marshal::StringToHGlobalAnsi(f->iIPNumberText->Text);
+                String^ params = f->iIPNumberText->Text + " " + f->iPortText->Text->Trim();
+                IntPtr p = Marshal::StringToHGlobalAnsi(params);
                 const char* pAnsi = static_cast<const char*>(p.ToPointer());
 
                  // Launch connecting to the server
@@ -191,6 +251,17 @@ private: System::Void button3_Click(System::Object^  sender, System::EventArgs^ 
                  }
              }
              delete f;
+         }
+private: System::Void scriptCompilerButton_Click(System::Object^ sender, System::EventArgs^ e) {
+             if (scriptCompilerForm == nullptr || scriptCompilerForm->IsDisposed) {
+                 scriptCompilerForm = gcnew ScriptCompilerForm(
+                     System::IO::Path::Combine(Application::StartupPath, "AAScriptCompiler.exe"));
+             }
+             scriptCompilerForm->Show();
+             scriptCompilerForm->Activate();
+         }
+private: System::Void exitButton_Click(System::Object^ sender, System::EventArgs^ e) {
+             Application::Exit();
          }
 
 private: System::Void button2_Click(System::Object^  sender, System::EventArgs^  e) {

@@ -19,16 +19,21 @@ int main(int argc, char *argv[])
     QCommandLineOption serverPathOpt("server-path",
         "Full path to the AAServer binary (default: AAServer alongside launcher).",
         "path");
+    QCommandLineOption scriptCompilerPathOpt("script-compiler-path",
+        "Full path to the AAScriptCompiler binary (default: AAScriptCompiler alongside launcher).",
+        "path");
     QCommandLineOption portOpt("port",
         "IPX UDP port for server and client (default: 21300).",
         "port");
 
     parser.addOption(aaPathOpt);
     parser.addOption(serverPathOpt);
+    parser.addOption(scriptCompilerPathOpt);
     parser.addOption(portOpt);
     parser.process(app);
 
-    MainWindow w(parser.value(aaPathOpt), parser.value(serverPathOpt), parser.value(portOpt));
+    MainWindow w(parser.value(aaPathOpt), parser.value(serverPathOpt),
+                 parser.value(scriptCompilerPathOpt), parser.value(portOpt));
     w.show();
 
     return app.exec();

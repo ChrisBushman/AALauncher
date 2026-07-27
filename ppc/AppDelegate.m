@@ -1,5 +1,6 @@
 #import "AppDelegate.h"
 #import "NetworkIPController.h"
+#import "ScriptCompilerController.h"
 
 static NSString *DefaultBinary(NSString *name)
 {
@@ -19,13 +20,16 @@ static NSString *DefaultBinary(NSString *name)
 
 - (id)initWithAABinary:(NSString *)aAaBinary
            serverBinary:(NSString *)aServerBinary
+   scriptCompilerBinary:(NSString *)aScriptCompilerBinary
                    port:(NSString *)aPort
 {
     self = [super init];
     if (self)  {
         aaBinary = [([aAaBinary length] ? aAaBinary : DefaultBinary(@"AA")) retain];
         serverBinary = [([aServerBinary length] ? aServerBinary : DefaultBinary(@"AAServer")) retain];
-        port = [aPort retain];
+        scriptCompilerBinary = [([aScriptCompilerBinary length] ? aScriptCompilerBinary : DefaultBinary(@"AAScriptCompiler")) retain];
+        // Applied to portField's initial text once it exists -- see applicationDidFinishLaunching.
+        initialPort = [([aPort length] ? aPort : @"21300") retain];
     }
     return self;
 }
@@ -34,13 +38,15 @@ static NSString *DefaultBinary(NSString *name)
 {
     [aaBinary release];
     [serverBinary release];
-    [port release];
+    [scriptCompilerBinary release];
+    [initialPort release];
+    [scriptCompilerController release];
     [super dealloc];
 }
 
 - (void)applicationDidFinishLaunching:(NSNotification *)note
 {
-    NSRect frame = NSMakeRect(0, 0, 1049, 562);
+    NSRect frame = NSMakeRect(0, 0, 1049, 622);
     window = [[NSWindow alloc] initWithContentRect:frame
                                           styleMask:(NSTitledWindowMask | NSClosableWindowMask | NSMiniaturizableWindowMask)
                                             backing:NSBackingStoreBuffered
@@ -50,15 +56,14 @@ static NSString *DefaultBinary(NSString *name)
 
     NSView *content = [window contentView];
 
-    /* Button bar: bottom 100px of the window (Cocoa's default view
-       coordinate origin is bottom-left, so this sits at y=0..100). Web
-       view fills the remaining space above it. Button positions/sizes
-       match the Windows/Qt reference layout exactly -- its 21px top
-       margin and 21px bottom margin within a 100px bar happen to be
-       numerically identical once converted to Cocoa's bottom-up
-       coordinates (100 - 21 - 58 = 21), so the same y=21 constant works
-       in both coordinate systems. */
-    webView = [[WebView alloc] initWithFrame:NSMakeRect(0, 100, 1049, 462) frameName:nil groupName:nil];
+    /* Button bar: bottom 160px of the window (Cocoa's default view
+       coordinate origin is bottom-left, so this sits at y=0..160). Web
+       view fills the remaining space above it. Two rows: the original 3
+       buttons sit at y=81 (21px below the web view, same as the original
+       single-row 100px-bar layout), and a second row below at y~16-44
+       holds the server port field plus the script compiler / exit
+       buttons. */
+    webView = [[WebView alloc] initWithFrame:NSMakeRect(0, 160, 1049, 462) frameName:nil groupName:nil];
     [content addSubview:webView];
     [[webView mainFrame] loadRequest:
         [NSURLRequest requestWithURL:
@@ -66,7 +71,7 @@ static NSString *DefaultBinary(NSString *name)
 
     NSFont *boldFont = [NSFont boldSystemFontOfSize:13];
 
-    NSButton *btnServer = [[[NSButton alloc] initWithFrame:NSMakeRect(148, 21, 234, 58)] autorelease];
+    NSButton *btnServer = [[[NSButton alloc] initWithFrame:NSMakeRect(148, 81, 234, 58)] autorelease];
     [btnServer setTitle:@"Start A&A Server"];
     [btnServer setFont:boldFont];
     [btnServer setBezelStyle:NSRoundedBezelStyle];
@@ -74,7 +79,7 @@ static NSString *DefaultBinary(NSString *name)
     [btnServer setAction:@selector(startServer:)];
     [content addSubview:btnServer];
 
-    NSButton *btnNetwork = [[[NSButton alloc] initWithFrame:NSMakeRect(406, 21, 234, 58)] autorelease];
+    NSButton *btnNetwork = [[[NSButton alloc] initWithFrame:NSMakeRect(406, 81, 234, 58)] autorelease];
     [btnNetwork setTitle:@"Play Network Game"];
     [btnNetwork setFont:boldFont];
     [btnNetwork setBezelStyle:NSRoundedBezelStyle];
@@ -82,13 +87,39 @@ static NSString *DefaultBinary(NSString *name)
     [btnNetwork setAction:@selector(playNetwork:)];
     [content addSubview:btnNetwork];
 
-    NSButton *btnSingle = [[[NSButton alloc] initWithFrame:NSMakeRect(665, 21, 234, 58)] autorelease];
+    NSButton *btnSingle = [[[NSButton alloc] initWithFrame:NSMakeRect(665, 81, 234, 58)] autorelease];
     [btnSingle setTitle:@"Play Single Player"];
     [btnSingle setFont:boldFont];
     [btnSingle setBezelStyle:NSRoundedBezelStyle];
     [btnSingle setTarget:self];
     [btnSingle setAction:@selector(playSinglePlayer:)];
     [content addSubview:btnSingle];
+
+    NSTextField *portLabel = [[[NSTextField alloc] initWithFrame:NSMakeRect(148, 22, 90, 18)] autorelease];
+    [portLabel setStringValue:@"Server Port:"];
+    [portLabel setEditable:NO];
+    [portLabel setSelectable:NO];
+    [portLabel setBezeled:NO];
+    [portLabel setDrawsBackground:NO];
+    [content addSubview:portLabel];
+
+    portField = [[NSTextField alloc] initWithFrame:NSMakeRect(240, 18, 70, 22)];
+    [portField setStringValue:initialPort];
+    [content addSubview:portField];
+
+    NSButton *btnScriptCompiler = [[[NSButton alloc] initWithFrame:NSMakeRect(406, 16, 234, 30)] autorelease];
+    [btnScriptCompiler setTitle:@"Script Compiler"];
+    [btnScriptCompiler setBezelStyle:NSRoundedBezelStyle];
+    [btnScriptCompiler setTarget:self];
+    [btnScriptCompiler setAction:@selector(openScriptCompiler:)];
+    [content addSubview:btnScriptCompiler];
+
+    NSButton *btnExit = [[[NSButton alloc] initWithFrame:NSMakeRect(665, 16, 234, 30)] autorelease];
+    [btnExit setTitle:@"Exit"];
+    [btnExit setBezelStyle:NSRoundedBezelStyle];
+    [btnExit setTarget:self];
+    [btnExit setAction:@selector(exitApplication:)];
+    [content addSubview:btnExit];
 
     [window makeKeyAndOrderFront:nil];
     [NSApp activateIgnoringOtherApps:YES];
@@ -131,9 +162,10 @@ static NSString *DefaultBinary(NSString *name)
 
 - (void)startServer:(id)sender
 {
+    NSString *portValue = [[portField stringValue] stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
     NSMutableArray *args = [NSMutableArray array];
-    if ([port length])
-        [args addObject:port];
+    if ([portValue length])
+        [args addObject:portValue];
     [self launchProcess:serverBinary arguments:args];
 }
 
@@ -143,10 +175,11 @@ static NSString *DefaultBinary(NSString *name)
     NSString *ip = [ipController runModal];
     if (![ip length])
         return;
+    NSString *ipPort = [ipController selectedPort];
 
     NSMutableArray *args = [NSMutableArray arrayWithObject:ip];
-    if ([port length])
-        [args addObject:port];
+    if ([ipPort length])
+        [args addObject:ipPort];
     if ([self launchProcess:aaBinary arguments:args])
         [NSApp terminate:nil];
 }
@@ -155,6 +188,18 @@ static NSString *DefaultBinary(NSString *name)
 {
     if ([self launchProcess:aaBinary arguments:[NSArray array]])
         [NSApp terminate:nil];
+}
+
+- (void)openScriptCompiler:(id)sender
+{
+    if (scriptCompilerController == nil)
+        scriptCompilerController = [[ScriptCompilerController alloc] initWithCompilerPath:scriptCompilerBinary];
+    [scriptCompilerController showWindow];
+}
+
+- (void)exitApplication:(id)sender
+{
+    [NSApp terminate:nil];
 }
 
 @end

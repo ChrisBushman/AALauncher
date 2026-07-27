@@ -1,11 +1,13 @@
 #include "MainWindow.h"
 #include "NetworkIPDialog.h"
+#include "ScriptCompilerWindow.h"
 
 #include <QApplication>
 #include <QCoreApplication>
 #include <QDir>
 #include <QFileInfo>
 #include <QFont>
+#include <QLabel>
 #include <QMessageBox>
 #include <QProcess>
 #include <QProcessEnvironment>
@@ -18,20 +20,24 @@ static QString defaultBinary(const QString &name)
     return QCoreApplication::applicationDirPath() + QDir::separator() + name;
 }
 
-MainWindow::MainWindow(const QString &aaPath, const QString &serverPath, const QString &port, QWidget *parent)
+MainWindow::MainWindow(const QString &aaPath, const QString &serverPath,
+                       const QString &scriptCompilerPath, const QString &port, QWidget *parent)
     : QMainWindow(parent)
     , m_aaBinary(aaPath.isEmpty() ? defaultBinary("AA") : aaPath)
     , m_serverBinary(serverPath.isEmpty() ? defaultBinary("AAServer") : serverPath)
-    , m_port(port)
+    , m_scriptCompilerBinary(scriptCompilerPath.isEmpty() ? defaultBinary("AAScriptCompiler") : scriptCompilerPath)
 {
     setupUi();
+    if (!port.isEmpty())
+        m_portEdit->setText(port);
 }
 
 void MainWindow::setupUi()
 {
     setWindowTitle("Amulets & Armor macOS Launcher v1.00");
-    // Match the Windows client size exactly
-    setFixedSize(1049, 562);
+    // Match the Windows client's web-view width; extra height below for the
+    // 2-row button bar (original 3 buttons, plus port/script-compiler/exit).
+    setFixedSize(1049, 622);
 
     QWidget *central = new QWidget(this);
     setCentralWidget(central);
@@ -45,9 +51,10 @@ void MainWindow::setupUi()
     m_webView->setUrl(QUrl("http://www.amuletsandarmor.com/index.htm?launcher=1&classic=1"));
     vLayout->addWidget(m_webView, 1);
 
-    // Bottom button bar (100px), with absolute button geometry matching the Windows source
+    // Bottom button bar (160px): original 3-button row on top, a second row
+    // below with the server port field, script compiler, and exit.
     QWidget *buttonBar = new QWidget(this);
-    buttonBar->setFixedHeight(100);
+    buttonBar->setFixedHeight(160);
     vLayout->addWidget(buttonBar, 0);
 
     QFont btnFont;
@@ -66,9 +73,24 @@ void MainWindow::setupUi()
     m_btnSingle->setFont(btnFont);
     m_btnSingle->setGeometry(665, 21, 234, 58);
 
+    QLabel *portLabel = new QLabel("Server Port:", buttonBar);
+    portLabel->setGeometry(148, 100, 90, 24);
+
+    m_portEdit = new QLineEdit(buttonBar);
+    m_portEdit->setText("21300");
+    m_portEdit->setGeometry(240, 97, 70, 28);
+
+    m_btnScriptCompiler = new QPushButton("Script Compiler", buttonBar);
+    m_btnScriptCompiler->setGeometry(406, 92, 234, 40);
+
+    m_btnExit = new QPushButton("Exit", buttonBar);
+    m_btnExit->setGeometry(665, 92, 234, 40);
+
     connect(m_btnServer,  &QPushButton::clicked, this, &MainWindow::onStartServer);
     connect(m_btnNetwork, &QPushButton::clicked, this, &MainWindow::onPlayNetwork);
     connect(m_btnSingle,  &QPushButton::clicked, this, &MainWindow::onPlaySinglePlayer);
+    connect(m_btnScriptCompiler, &QPushButton::clicked, this, &MainWindow::onScriptCompiler);
+    connect(m_btnExit, &QPushButton::clicked, this, &QWidget::close);
 }
 
 bool MainWindow::launchProcess(const QString &binaryPath, const QStringList &args)
@@ -102,21 +124,23 @@ bool MainWindow::launchProcess(const QString &binaryPath, const QStringList &arg
 void MainWindow::onStartServer()
 {
     QStringList args;
-    if (!m_port.isEmpty())
-        args << m_port;
+    QString port = m_portEdit->text().trimmed();
+    if (!port.isEmpty())
+        args << port;
     launchProcess(m_serverBinary, args);
 }
 
 void MainWindow::onPlayNetwork()
 {
-    NetworkIPDialog dlg(this);
+    NetworkIPDialog dlg(m_portEdit->text().trimmed(), this);
     if (dlg.exec() == QDialog::Accepted) {
         QString ip = dlg.ipAddress();
         if (ip.isEmpty())
             return;
         QStringList args = {ip};
-        if (!m_port.isEmpty())
-            args << m_port;
+        QString port = dlg.port();
+        if (!port.isEmpty())
+            args << port;
         if (launchProcess(m_aaBinary, args))
             close();
     }
@@ -126,4 +150,13 @@ void MainWindow::onPlaySinglePlayer()
 {
     if (launchProcess(m_aaBinary, {}))
         close();
+}
+
+void MainWindow::onScriptCompiler()
+{
+    if (!m_scriptCompilerWindow)
+        m_scriptCompilerWindow = new ScriptCompilerWindow(m_scriptCompilerBinary);
+    m_scriptCompilerWindow->show();
+    m_scriptCompilerWindow->raise();
+    m_scriptCompilerWindow->activateWindow();
 }
