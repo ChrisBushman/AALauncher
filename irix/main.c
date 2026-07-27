@@ -470,6 +470,21 @@ static void JoinDialogSave(Widget w, XtPointer clientData, XtPointer callData)
     AppendSavedServer(name, host, port);
 }
 
+/* Xaw's Dialog widget has XawDialogGetValueString() but no setter --
+   reach its internal "value" child (an AsciiText widget; this is how
+   every other Xaw program that needs to do this does it too) and set
+   its string resource directly. */
+static void SetDialogValue(Widget dialog, const char *value)
+{
+    Widget valueWidget = XtNameToWidget(dialog, "value");
+    Arg args[1];
+
+    if (valueWidget == NULL)
+        return;
+    XtSetArg(args[0], XtNstring, value);
+    XtSetValues(valueWidget, args, 1);
+}
+
 static void JoinListCallback(Widget w, XtPointer clientData, XtPointer callData)
 {
     XawListReturnStruct *ret = (XawListReturnStruct *)callData;
@@ -478,8 +493,8 @@ static void JoinListCallback(Widget w, XtPointer clientData, XtPointer callData)
     if (ret->list_index >= G_serverCount)
         return;
 
-    XawDialogSetValue(G_joinHostDialog, G_serverHosts[ret->list_index]);
-    XawDialogSetValue(G_joinPortDialog, G_serverPorts[ret->list_index]);
+    SetDialogValue(G_joinHostDialog, G_serverHosts[ret->list_index]);
+    SetDialogValue(G_joinPortDialog, G_serverPorts[ret->list_index]);
 }
 
 static void PlayNetworkCallback(Widget w, XtPointer clientData, XtPointer callData)
