@@ -20,13 +20,12 @@ namespace AALauncher {
 	   DISCOVERY_REPLY_PREFIX -- kept as literals here rather than a shared
 	   header since the launcher and server are separate repos/build
 	   systems. */
+	// Native (unmanaged) type -- plain static is fine. Managed types
+	// (String^) can't be static/global at namespace scope in C++/CLI
+	// (error C3145) and literal is only permitted as a ref class member,
+	// not at namespace scope either -- so the magic strings below are
+	// declared as local String^ variables at each use site instead.
 	static const int DiscoveryPort = 21399;
-	// literal, not static: C++/CLI doesn't allow a plain static variable of
-	// managed type (String^) at namespace scope (error C3145) -- literal is
-	// the compile-time-constant qualifier for managed types, analogous to
-	// const for native ones.
-	literal String^ DiscoveryRequestMagic = "AASERVER_DISCOVER";
-	literal String^ DiscoveryReplyPrefix = "AASERVER_HERE:";
 
 	// One row in the known-servers list -- ToString() is what ListBox
 	// displays, since ListBox.Items shows each item's own ToString() by
@@ -283,13 +282,18 @@ namespace AALauncher {
 		}
 
 		System::Void DiscoveryWorker_DoWork(System::Object^ sender, System::ComponentModel::DoWorkEventArgs^ e) {
+			// Local String^ variables, not static/global -- see the comment
+			// by DiscoveryPort's declaration for why these can't live at
+			// namespace scope.
+			String^ requestMagic = "AASERVER_DISCOVER";
+			String^ replyPrefix = "AASERVER_HERE:";
 			BackgroundWorker^ worker = (BackgroundWorker^)sender;
 			UdpClient^ client = gcnew UdpClient();
 			try {
 				client->EnableBroadcast = true;
 				client->Client->ReceiveTimeout = 200;
 
-				array<Byte>^ reqBytes = Encoding::ASCII->GetBytes(DiscoveryRequestMagic);
+				array<Byte>^ reqBytes = Encoding::ASCII->GetBytes(requestMagic);
 				client->Send(reqBytes, reqBytes->Length, gcnew IPEndPoint(IPAddress::Broadcast, DiscoveryPort));
 
 				DateTime deadline = DateTime::Now.AddMilliseconds(1500);
@@ -298,8 +302,8 @@ namespace AALauncher {
 					try {
 						array<Byte>^ data = client->Receive(remoteEP);
 						String^ text = Encoding::ASCII->GetString(data);
-						if (text->StartsWith(DiscoveryReplyPrefix)) {
-							String^ rest = text->Substring(DiscoveryReplyPrefix->Length);
+						if (text->StartsWith(replyPrefix)) {
+							String^ rest = text->Substring(replyPrefix->Length);
 							array<String^>^ parts = rest->Split(gcnew array<Char>{':'});
 							if (parts->Length >= 2) {
 								ServerListEntry^ entry = gcnew ServerListEntry(parts[1] + " [LAN]", remoteEP->Address->ToString(), parts[0]);
