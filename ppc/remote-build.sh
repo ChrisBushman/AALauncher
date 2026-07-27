@@ -37,6 +37,7 @@ rsync -avz --delete \
     --exclude='out/' \
     --exclude='ppc/build/' \
     --exclude='irix/build/' \
+    --exclude='dist/' \
     "$REPO_ROOT/" "$AA_PPC_HOST:$REMOTE_PATH/"
 
 if [ -z "${AA_PPC_MAKE:-}" ]; then

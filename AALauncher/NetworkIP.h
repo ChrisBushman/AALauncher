@@ -21,8 +21,12 @@ namespace AALauncher {
 	   header since the launcher and server are separate repos/build
 	   systems. */
 	static const int DiscoveryPort = 21399;
-	static String^ DiscoveryRequestMagic = "AASERVER_DISCOVER";
-	static String^ DiscoveryReplyPrefix = "AASERVER_HERE:";
+	// literal, not static: C++/CLI doesn't allow a plain static variable of
+	// managed type (String^) at namespace scope (error C3145) -- literal is
+	// the compile-time-constant qualifier for managed types, analogous to
+	// const for native ones.
+	literal String^ DiscoveryRequestMagic = "AASERVER_DISCOVER";
+	literal String^ DiscoveryReplyPrefix = "AASERVER_HERE:";
 
 	// One row in the known-servers list -- ToString() is what ListBox
 	// displays, since ListBox.Items shows each item's own ToString() by
