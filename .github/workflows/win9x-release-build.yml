@@ -1,0 +1,45 @@
+name: Windows 9x release build
+
+# One-off/manual cross-compile build, not a permanent CI gate -- there is
+# no Windows 95/98/ME GitHub Actions runner, so this only proves the
+# build stays green. Real verification happens on real hardware.
+# Triggered by hand from the Actions tab or
+# `gh workflow run win9x-release-build.yml`.
+#
+# This launcher lives at win9x/ (source + Makefile together), not
+# Build/Win9x/ like the sibling AmuletsArmor/AAServer repos -- see
+# win9x/Makefile's own header comment for why (this repo already has a
+# gitignored local build/ directory that collides with a same-named
+# Build/ on case-insensitive filesystems).
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install mingw-w64 cross toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-mingw-w64-i686 make zip
+
+      - name: Rebuild mingw-w64-crt at -march=i486 (real-hardware fix)
+        run: win9x/rebuild-mingw-crt-i486.sh
+
+      - name: Build AALauncher.exe (Win9x)
+        run: make -C win9x package
+
+      - name: Package release archive
+        run: |
+          STAGE=AALauncher-Win9x
+          mkdir -p "$STAGE"
+          cp win9x/build/package/* "$STAGE/"
+          zip -rq AALauncher-Win9x.zip "$STAGE"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: AALauncher-Win9x
+          path: AALauncher-Win9x.zip
+          if-no-files-found: error
