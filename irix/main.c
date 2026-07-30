@@ -29,6 +29,7 @@
 #include <X11/Xaw/List.h>
 #include <X11/Xaw/Viewport.h>
 #include <X11/Xaw/AsciiText.h>
+#include <X11/Xaw/Toggle.h>
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -566,6 +567,249 @@ static void PlayNetworkCallback(Widget w, XtPointer clientData, XtPointer callDa
 }
 
 /*--------------------------------------------------------------------------*/
+/* "Display Settings" dialog -- Fullscreen/Windowed, Color Depth, and Level
+   of Detail, writing directly to resolution.ini (read by AA.exe's RESSCALE
+   module, see AmuletsArmor's Source/Win32/RESSCALE.C) in the same
+   directory as G_aaBinary. Same 3 settings and same resolution.ini format
+   as the other launchers (see mac/DisplaySettingsDialog.cpp,
+   ppc/DisplaySettingsController.m, win9x/main.c). Radio-button grouping
+   uses Xaw's Toggle widget XtNradioGroup/XtNradioData mechanism: each
+   group's first Toggle anchors XtNradioGroup for the rest, XtNradioData
+   identifies which one is selected, and XawToggleSetCurrent/
+   XawToggleGetCurrent (passing any widget in the group) select/read it. */
+static Widget G_displayShell = NULL;
+static Widget G_dispWindowedToggle, G_dispFullscreenToggle;
+static Widget G_dispBppToggle[5];     /* radioData: 0(auto),8,16,24,32 */
+static Widget G_dispDetailToggle[6];  /* radioData: 1..6 */
+
+static char *DirOfPath(const char *path)
+{
+    char *result = strdup(path);
+    char *slash = strrchr(result, '/');
+    if (slash != NULL)  {
+        *slash = '\0';
+    } else {
+        free(result);
+        result = strdup(".");
+    }
+    return result;
+}
+
+static char *DisplaySettingsIniPath(void)
+{
+    char *dir = DirOfPath(G_aaBinary);
+    char *result = malloc(strlen(dir) + strlen("/resolution.ini") + 1);
+    sprintf(result, "%s/resolution.ini", dir);
+    free(dir);
+    return result;
+}
+
+static void LoadDisplaySettingsFromIni(void)
+{
+    /* Defaults match RESSCALE.C's own compiled-in defaults (fullscreen=1,
+       bpp=0/auto, detail=2) so this dialog shows the same choice AA.exe
+       itself would default to before resolution.ini exists. */
+    int fullscreen = 1, bpp = 0, detail = 2;
+    char *path = DisplaySettingsIniPath();
+    FILE *fp = fopen(path, "r");
+    char line[256];
+
+    free(path);
+    if (fp != NULL)  {
+        while (fgets(line, sizeof(line), fp) != NULL)  {
+            char key[64];
+            int value;
+            if (sscanf(line, "%63[^=]=%d", key, &value) == 2)  {
+                if (strcmp(key, "fullscreen") == 0) fullscreen = value;
+                else if (strcmp(key, "bpp") == 0) bpp = value;
+                else if (strcmp(key, "detail") == 0) detail = value;
+            }
+        }
+        fclose(fp);
+    }
+
+    if (detail < 1) detail = 1;
+    if (detail > 6) detail = 6;
+
+    XawToggleSetCurrent(G_dispWindowedToggle, (XtPointer)(long)fullscreen);
+    XawToggleSetCurrent(G_dispBppToggle[0], (XtPointer)(long)bpp);
+    XawToggleSetCurrent(G_dispDetailToggle[0], (XtPointer)(long)detail);
+}
+
+static void SaveDisplaySettingsToIni(void)
+{
+    /* Rewrites resolution.ini with the current selections, preserving
+       every other line (comments, scale=/fit=/aspect=/hotkeys=) exactly
+       as found -- same merge-preserve approach as the other launchers'
+       ini writers, for the same reason: an explicit width=/height=
+       otherwise pins the window regardless of detail level (RESSCALE.C's
+       IComputeWindowSize gives explicit width=/height= priority over
+       scale=), so window size needs to be rewritten alongside detail
+       level, not left stale. */
+    int fullscreen = (int)(long)XawToggleGetCurrent(G_dispWindowedToggle);
+    int bpp = (int)(long)XawToggleGetCurrent(G_dispBppToggle[0]);
+    int detail = (int)(long)XawToggleGetCurrent(G_dispDetailToggle[0]);
+    static const int widths[6]  = { 640, 1024, 1280, 1280, 1280, 1280 };
+    static const int heights[6] = { 480,  768,  960,  960,  960,  960 };
+    int width, height;
+    char *path, *tmpPath;
+    FILE *inFp, *outFp;
+    char line[256];
+
+    if (detail < 1) detail = 1;
+    if (detail > 6) detail = 6;
+    width = widths[detail - 1];
+    height = heights[detail - 1];
+
+    path = DisplaySettingsIniPath();
+    tmpPath = malloc(strlen(path) + 5);
+    sprintf(tmpPath, "%s.tmp", path);
+
+    outFp = fopen(tmpPath, "w");
+    if (outFp == NULL)  {
+        free(path);
+        free(tmpPath);
+        return;
+    }
+
+    inFp = fopen(path, "r");
+    if (inFp != NULL)  {
+        while (fgets(line, sizeof(line), inFp) != NULL)  {
+            if (strncmp(line, "fullscreen=", 11) == 0) continue;
+            if (strncmp(line, "bpp=", 4) == 0) continue;
+            if (strncmp(line, "detail=", 7) == 0) continue;
+            if (strncmp(line, "width=", 6) == 0) continue;
+            if (strncmp(line, "height=", 7) == 0) continue;
+            fputs(line, outFp);
+        }
+        fclose(inFp);
+    }
+
+    fprintf(outFp, "fullscreen=%d\n", fullscreen);
+    fprintf(outFp, "bpp=%d\n", bpp);
+    fprintf(outFp, "detail=%d\n", detail);
+    fprintf(outFp, "width=%d\n", width);
+    fprintf(outFp, "height=%d\n", height);
+    fclose(outFp);
+
+    rename(tmpPath, path);
+    free(tmpPath);
+    free(path);
+}
+
+static void DisplaySettingsOk(Widget w, XtPointer clientData, XtPointer callData)
+{
+    SaveDisplaySettingsToIni();
+    XtPopdown(G_displayShell);
+}
+
+static void DisplaySettingsCancel(Widget w, XtPointer clientData, XtPointer callData)
+{
+    XtPopdown(G_displayShell);
+}
+
+static void DisplaySettingsCallback(Widget w, XtPointer clientData, XtPointer callData)
+{
+    Arg args[8];
+    int n;
+
+    if (G_displayShell == NULL)  {
+        Widget form2, displayLabel, bppLabel, detailLabel, okButton, cancelButton;
+        Widget prevWidget;
+        int i;
+        static const char *bppLabels[5] = { "Auto (recommended)", "8-bit", "16-bit", "24-bit", "32-bit" };
+        static const int bppValues[5] = { 0, 8, 16, 24, 32 };
+        static const char *detailLabels[6] = {
+            "1 (fastest, 640x480)", "2 (1024x768)", "3 (1280x960)",
+            "4 (1280x960)", "5 (1280x960)", "6 (sharpest, 1280x960)",
+        };
+
+        n = 0;
+        XtSetArg(args[n], XtNtitle, "Display Settings"); n++;
+        G_displayShell = XtCreatePopupShell("displayShell", transientShellWidgetClass,
+                                             G_topLevel, args, n);
+
+        n = 0;
+        form2 = XtCreateManagedWidget("displayForm", formWidgetClass, G_displayShell, args, n);
+
+        n = 0;
+        XtSetArg(args[n], XtNlabel, "Display:"); n++;
+        XtSetArg(args[n], XtNborderWidth, 0); n++;
+        displayLabel = XtCreateManagedWidget("displayLabel", labelWidgetClass, form2, args, n);
+
+        n = 0;
+        XtSetArg(args[n], XtNlabel, "Windowed"); n++;
+        XtSetArg(args[n], XtNfromVert, displayLabel); n++;
+        XtSetArg(args[n], XtNradioData, (XtPointer)(long)0); n++;
+        G_dispWindowedToggle = XtCreateManagedWidget("dispWindowed", toggleWidgetClass, form2, args, n);
+
+        n = 0;
+        XtSetArg(args[n], XtNlabel, "Fullscreen"); n++;
+        XtSetArg(args[n], XtNfromVert, displayLabel); n++;
+        XtSetArg(args[n], XtNfromHoriz, G_dispWindowedToggle); n++;
+        XtSetArg(args[n], XtNradioGroup, G_dispWindowedToggle); n++;
+        XtSetArg(args[n], XtNradioData, (XtPointer)(long)1); n++;
+        G_dispFullscreenToggle = XtCreateManagedWidget("dispFullscreen", toggleWidgetClass, form2, args, n);
+
+        n = 0;
+        XtSetArg(args[n], XtNlabel, "Color Depth:"); n++;
+        XtSetArg(args[n], XtNborderWidth, 0); n++;
+        XtSetArg(args[n], XtNfromVert, G_dispWindowedToggle); n++;
+        bppLabel = XtCreateManagedWidget("bppLabel", labelWidgetClass, form2, args, n);
+
+        prevWidget = NULL;
+        for (i = 0; i < 5; i++)  {
+            n = 0;
+            XtSetArg(args[n], XtNlabel, bppLabels[i]); n++;
+            XtSetArg(args[n], XtNfromVert, bppLabel); n++;
+            if (prevWidget != NULL)  {
+                XtSetArg(args[n], XtNfromHoriz, prevWidget); n++;
+                XtSetArg(args[n], XtNradioGroup, G_dispBppToggle[0]); n++;
+            }
+            XtSetArg(args[n], XtNradioData, (XtPointer)(long)bppValues[i]); n++;
+            G_dispBppToggle[i] = XtCreateManagedWidget("dispBpp", toggleWidgetClass, form2, args, n);
+            prevWidget = G_dispBppToggle[i];
+        }
+
+        n = 0;
+        XtSetArg(args[n], XtNlabel, "Level of Detail (also sets window size):"); n++;
+        XtSetArg(args[n], XtNborderWidth, 0); n++;
+        XtSetArg(args[n], XtNfromVert, G_dispBppToggle[0]); n++;
+        detailLabel = XtCreateManagedWidget("detailLabel", labelWidgetClass, form2, args, n);
+
+        prevWidget = detailLabel;
+        for (i = 0; i < 6; i++)  {
+            n = 0;
+            XtSetArg(args[n], XtNlabel, detailLabels[i]); n++;
+            XtSetArg(args[n], XtNfromVert, prevWidget); n++;
+            XtSetArg(args[n], XtNleft, XtChainLeft); n++;
+            if (i > 0)  {
+                XtSetArg(args[n], XtNradioGroup, G_dispDetailToggle[0]); n++;
+            }
+            XtSetArg(args[n], XtNradioData, (XtPointer)(long)(i + 1)); n++;
+            G_dispDetailToggle[i] = XtCreateManagedWidget("dispDetail", toggleWidgetClass, form2, args, n);
+            prevWidget = G_dispDetailToggle[i];
+        }
+
+        n = 0;
+        XtSetArg(args[n], XtNlabel, "Cancel"); n++;
+        XtSetArg(args[n], XtNfromVert, prevWidget); n++;
+        cancelButton = XtCreateManagedWidget("dispCancel", commandWidgetClass, form2, args, n);
+        XtAddCallback(cancelButton, XtNcallback, DisplaySettingsCancel, NULL);
+
+        n = 0;
+        XtSetArg(args[n], XtNlabel, "OK"); n++;
+        XtSetArg(args[n], XtNfromVert, prevWidget); n++;
+        XtSetArg(args[n], XtNfromHoriz, cancelButton); n++;
+        okButton = XtCreateManagedWidget("dispOk", commandWidgetClass, form2, args, n);
+        XtAddCallback(okButton, XtNcallback, DisplaySettingsOk, NULL);
+    }
+
+    LoadDisplaySettingsFromIni();
+    XtPopup(G_displayShell, XtGrabExclusive);
+}
+
+/*--------------------------------------------------------------------------*/
 /* Web view area, above the button row. Normally shows the embedded
    nsfb (NetSurf) browser via SDL_WINDOWID reparenting -- see
    LaunchWebView. If the nsfb binary can't be found (e.g. a partial
@@ -943,7 +1187,7 @@ static char *ArgValue(int argc, char **argv, const char *flag)
 
 int main(int argc, char **argv)
 {
-    Widget form, btnServer, btnNetwork, btnSingle, btnScriptCompiler, btnExit;
+    Widget form, btnServer, btnNetwork, btnSingle, btnDisplaySettings, btnScriptCompiler, btnExit;
     Arg args[10];
     int n;
     char *aaPath, *serverPath, *webviewPath, *webviewResDir, *scriptCompilerPath;
@@ -1123,8 +1367,24 @@ int main(int argc, char **argv)
         G_portDialog = XtCreateManagedWidget("portDialog", dialogWidgetClass, form, args, n);
 
         n = 0;
-        XtSetArg(args[n], XtNlabel, "Script Compiler"); n++;
+        XtSetArg(args[n], XtNlabel, "Display Settings"); n++;
         XtSetArg(args[n], XtNfromHoriz, G_portDialog); n++;
+        XtSetArg(args[n], XtNhorizDistance, btnSpacing); n++;
+        XtSetArg(args[n], XtNfromVert, btnServer); n++;
+        XtSetArg(args[n], XtNtop, XtChainTop); n++;
+        XtSetArg(args[n], XtNbackground, bgPixel); n++;
+        XtSetArg(args[n], XtNforeground, fgPixel); n++;
+        XtSetArg(args[n], XtNinternalWidth, 20); n++;
+        XtSetArg(args[n], XtNinternalHeight, 12); n++;
+        if (buttonFontStruct != NULL)  {
+            XtSetArg(args[n], XtNfont, buttonFontStruct); n++;
+        }
+        btnDisplaySettings = XtCreateManagedWidget("btnDisplaySettings", commandWidgetClass, form, args, n);
+        XtAddCallback(btnDisplaySettings, XtNcallback, DisplaySettingsCallback, NULL);
+
+        n = 0;
+        XtSetArg(args[n], XtNlabel, "Script Compiler"); n++;
+        XtSetArg(args[n], XtNfromHoriz, btnDisplaySettings); n++;
         XtSetArg(args[n], XtNhorizDistance, btnSpacing); n++;
         XtSetArg(args[n], XtNfromVert, btnServer); n++;
         XtSetArg(args[n], XtNtop, XtChainTop); n++;

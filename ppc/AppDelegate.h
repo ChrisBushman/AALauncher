@@ -24,6 +24,7 @@
 - (void)playNetwork:(id)sender;
 - (void)playSinglePlayer:(id)sender;
 - (void)openScriptCompiler:(id)sender;
+- (void)openDisplaySettings:(id)sender;
 - (void)exitApplication:(id)sender;
 
 @end

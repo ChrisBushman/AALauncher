@@ -14,6 +14,8 @@ qt_add_executable(AALauncher
     main.cpp
     MainWindow.h
     MainWindow.cpp
+    DisplaySettingsDialog.h
+    DisplaySettingsDialog.cpp
     NetworkIPDialog.h
     NetworkIPDialog.cpp
     ScriptCompilerWindow.h

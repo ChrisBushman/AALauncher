@@ -1,4 +1,5 @@
 #import "AppDelegate.h"
+#import "DisplaySettingsController.h"
 #import "NetworkIPController.h"
 #import "ScriptCompilerController.h"
 
@@ -44,8 +45,41 @@ static NSString *DefaultBinary(NSString *name)
     [super dealloc];
 }
 
+- (void)setupMenuBar
+{
+    /* No nib/MainMenu.xib in this app, so no menu bar exists unless built
+       here in code. Kept minimal -- just the standard app menu (for Quit,
+       which OS X expects every app to offer) plus an Options menu for
+       Display Settings. */
+    NSMenu *mainMenu = [[[NSMenu alloc] init] autorelease];
+
+    NSMenuItem *appMenuItem = [[[NSMenuItem alloc] init] autorelease];
+    [mainMenu addItem:appMenuItem];
+    NSMenu *appMenu = [[[NSMenu alloc] init] autorelease];
+    NSMenuItem *quitItem = [[[NSMenuItem alloc] initWithTitle:@"Quit AALauncher"
+                                                        action:@selector(exitApplication:)
+                                                 keyEquivalent:@"q"] autorelease];
+    [quitItem setTarget:self];
+    [appMenu addItem:quitItem];
+    [appMenuItem setSubmenu:appMenu];
+
+    NSMenuItem *optionsMenuItem = [[[NSMenuItem alloc] init] autorelease];
+    [mainMenu addItem:optionsMenuItem];
+    NSMenu *optionsMenu = [[[NSMenu alloc] initWithTitle:@"Options"] autorelease];
+    NSMenuItem *displaySettingsItem = [[[NSMenuItem alloc] initWithTitle:@"Display Settings..."
+                                                                    action:@selector(openDisplaySettings:)
+                                                             keyEquivalent:@""] autorelease];
+    [displaySettingsItem setTarget:self];
+    [optionsMenu addItem:displaySettingsItem];
+    [optionsMenuItem setSubmenu:optionsMenu];
+
+    [NSApp setMainMenu:mainMenu];
+}
+
 - (void)applicationDidFinishLaunching:(NSNotification *)note
 {
+    [self setupMenuBar];
+
     NSRect frame = NSMakeRect(0, 0, 1049, 622);
     window = [[NSWindow alloc] initWithContentRect:frame
                                           styleMask:(NSTitledWindowMask | NSClosableWindowMask | NSMiniaturizableWindowMask)
@@ -195,6 +229,12 @@ static NSString *DefaultBinary(NSString *name)
     if (scriptCompilerController == nil)
         scriptCompilerController = [[ScriptCompilerController alloc] initWithCompilerPath:scriptCompilerBinary];
     [scriptCompilerController showWindow];
+}
+
+- (void)openDisplaySettings:(id)sender
+{
+    DisplaySettingsController *controller = [[[DisplaySettingsController alloc] initWithAABinary:aaBinary] autorelease];
+    [controller runModal];
 }
 
 - (void)exitApplication:(id)sender

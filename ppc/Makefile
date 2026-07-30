@@ -29,7 +29,7 @@ OBJC_FLAGS := -fobjc-exceptions
 FRAMEWORKS := -framework Cocoa -framework WebKit
 
 TARGET := $(BUILD_DIR)/AALauncher
-SOURCES := main.m AppDelegate.m NetworkIPController.m ScriptCompilerController.m
+SOURCES := main.m AppDelegate.m DisplaySettingsController.m NetworkIPController.m ScriptCompilerController.m
 OBJS := $(addprefix $(BUILD_DIR)/,$(SOURCES:.m=.m.o))
 
 .PHONY: all clean run

@@ -1,13 +1,17 @@
 #include "MainWindow.h"
+#include "DisplaySettingsDialog.h"
 #include "NetworkIPDialog.h"
 #include "ScriptCompilerWindow.h"
 
+#include <QAction>
 #include <QApplication>
 #include <QCoreApplication>
 #include <QDir>
 #include <QFileInfo>
 #include <QFont>
 #include <QLabel>
+#include <QMenu>
+#include <QMenuBar>
 #include <QMessageBox>
 #include <QProcess>
 #include <QProcessEnvironment>
@@ -91,6 +95,10 @@ void MainWindow::setupUi()
     connect(m_btnSingle,  &QPushButton::clicked, this, &MainWindow::onPlaySinglePlayer);
     connect(m_btnScriptCompiler, &QPushButton::clicked, this, &MainWindow::onScriptCompiler);
     connect(m_btnExit, &QPushButton::clicked, this, &QWidget::close);
+
+    QMenu *optionsMenu = menuBar()->addMenu("Options");
+    QAction *displaySettingsAction = optionsMenu->addAction("Display Settings...");
+    connect(displaySettingsAction, &QAction::triggered, this, &MainWindow::onDisplaySettings);
 }
 
 bool MainWindow::launchProcess(const QString &binaryPath, const QStringList &args)
@@ -159,4 +167,10 @@ void MainWindow::onScriptCompiler()
     m_scriptCompilerWindow->show();
     m_scriptCompilerWindow->raise();
     m_scriptCompilerWindow->activateWindow();
+}
+
+void MainWindow::onDisplaySettings()
+{
+    DisplaySettingsDialog dlg(m_aaBinary, this);
+    dlg.exec();
 }

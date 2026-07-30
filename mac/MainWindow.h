@@ -24,6 +24,7 @@ private slots:
     void onPlayNetwork();
     void onPlaySinglePlayer();
     void onScriptCompiler();
+    void onDisplaySettings();
 
 private:
     void setupUi();
