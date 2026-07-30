@@ -26,4 +26,8 @@
 - (id)initWithAABinary:(NSString *)anAaBinary;
 - (void)runModal;
 
+- (void)onDisplayRadioClicked:(id)sender;
+- (void)onBppRadioClicked:(id)sender;
+- (void)onDetailRadioClicked:(id)sender;
+
 @end

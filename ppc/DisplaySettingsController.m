@@ -6,7 +6,7 @@
 - (void)saveToIni;
 - (void)onOk:(id)sender;
 - (void)onCancel:(id)sender;
-- (NSButton *)radioWithFrame:(NSRect)frame title:(NSString *)title superview:(NSView *)superview;
+- (NSButton *)radioWithFrame:(NSRect)frame title:(NSString *)title superview:(NSView *)superview action:(SEL)action;
 @end
 
 @implementation DisplaySettingsController
@@ -32,19 +32,19 @@
         [displayBox setTitle:@"Display"];
         [content addSubview:displayBox];
         NSView *displayContent = [displayBox contentView];
-        windowedRadio = [self radioWithFrame:NSMakeRect(12, 6, 140, 20) title:@"Windowed" superview:displayContent];
-        fullscreenRadio = [self radioWithFrame:NSMakeRect(160, 6, 140, 20) title:@"Fullscreen" superview:displayContent];
+        windowedRadio = [self radioWithFrame:NSMakeRect(12, 6, 140, 20) title:@"Windowed" superview:displayContent action:@selector(onDisplayRadioClicked:)];
+        fullscreenRadio = [self radioWithFrame:NSMakeRect(160, 6, 140, 20) title:@"Fullscreen" superview:displayContent action:@selector(onDisplayRadioClicked:)];
 
         /* Color Depth box: y=286..386 */
         NSBox *bppBox = [[[NSBox alloc] initWithFrame:NSMakeRect(16, 286, 328, 100)] autorelease];
         [bppBox setTitle:@"Color Depth"];
         [content addSubview:bppBox];
         NSView *bppContent = [bppBox contentView];
-        bppAutoRadio = [self radioWithFrame:NSMakeRect(12, 58, 200, 20) title:@"Auto (recommended)" superview:bppContent];
-        bpp8Radio = [self radioWithFrame:NSMakeRect(12, 36, 90, 20) title:@"8-bit" superview:bppContent];
-        bpp16Radio = [self radioWithFrame:NSMakeRect(110, 36, 90, 20) title:@"16-bit" superview:bppContent];
-        bpp24Radio = [self radioWithFrame:NSMakeRect(12, 12, 90, 20) title:@"24-bit" superview:bppContent];
-        bpp32Radio = [self radioWithFrame:NSMakeRect(110, 12, 90, 20) title:@"32-bit" superview:bppContent];
+        bppAutoRadio = [self radioWithFrame:NSMakeRect(12, 58, 200, 20) title:@"Auto (recommended)" superview:bppContent action:@selector(onBppRadioClicked:)];
+        bpp8Radio = [self radioWithFrame:NSMakeRect(12, 36, 90, 20) title:@"8-bit" superview:bppContent action:@selector(onBppRadioClicked:)];
+        bpp16Radio = [self radioWithFrame:NSMakeRect(110, 36, 90, 20) title:@"16-bit" superview:bppContent action:@selector(onBppRadioClicked:)];
+        bpp24Radio = [self radioWithFrame:NSMakeRect(12, 12, 90, 20) title:@"24-bit" superview:bppContent action:@selector(onBppRadioClicked:)];
+        bpp32Radio = [self radioWithFrame:NSMakeRect(110, 12, 90, 20) title:@"32-bit" superview:bppContent action:@selector(onBppRadioClicked:)];
 
         /* Level of Detail box: y=76..276 (also sets window size, see saveToIni) */
         NSBox *detailBox = [[[NSBox alloc] initWithFrame:NSMakeRect(16, 76, 328, 200)] autorelease];
@@ -62,7 +62,7 @@
         int i;
         for (i = 0; i < 6; i++)  {
             NSRect r = NSMakeRect(12, 6 + (5 - i) * 26, 300, 20);
-            detailRadios[i] = [self radioWithFrame:r title:detailLabels[i] superview:detailContent];
+            detailRadios[i] = [self radioWithFrame:r title:detailLabels[i] superview:detailContent action:@selector(onDetailRadioClicked:)];
         }
 
         NSTextField *note = [[[NSTextField alloc] initWithFrame:NSMakeRect(16, 46, 328, 18)] autorelease];
@@ -101,16 +101,43 @@
     [super dealloc];
 }
 
-- (NSButton *)radioWithFrame:(NSRect)frame title:(NSString *)title superview:(NSView *)superview
+- (NSButton *)radioWithFrame:(NSRect)frame title:(NSString *)title superview:(NSView *)superview action:(SEL)action
 {
     NSButton *radio = [[[NSButton alloc] initWithFrame:frame] autorelease];
     [radio setButtonType:NSRadioButton];
     [radio setTitle:title];
-    /* Radio buttons that share an immediate superview auto-exclude in
-       AppKit -- each NSBox's contentView is a separate superview, so
-       grouping by box is enough; no NSMatrix needed. */
+    /* AppKit's documented same-superview radio auto-exclusion turned out
+       not to reliably apply here (confirmed on real PPC/Tiger hardware --
+       a newly-clicked radio wouldn't turn its sibling off, so saveToIni's
+       "first one still on" scan kept finding the ORIGINAL loadFromIni
+       selection instead of the user's new pick). Every action below
+       enforces exclusivity explicitly instead of depending on that
+       mechanism. */
+    [radio setTarget:self];
+    [radio setAction:action];
     [superview addSubview:radio];
     return radio;
+}
+
+- (void)onDisplayRadioClicked:(id)sender
+{
+    [windowedRadio setState:(sender == windowedRadio) ? NSOnState : NSOffState];
+    [fullscreenRadio setState:(sender == fullscreenRadio) ? NSOnState : NSOffState];
+}
+
+- (void)onBppRadioClicked:(id)sender
+{
+    NSButton *radios[5] = { bppAutoRadio, bpp8Radio, bpp16Radio, bpp24Radio, bpp32Radio };
+    int i;
+    for (i = 0; i < 5; i++)
+        [radios[i] setState:(sender == radios[i]) ? NSOnState : NSOffState];
+}
+
+- (void)onDetailRadioClicked:(id)sender
+{
+    int i;
+    for (i = 0; i < 6; i++)
+        [detailRadios[i] setState:(sender == detailRadios[i]) ? NSOnState : NSOffState];
 }
 
 - (NSString *)iniPath
@@ -149,7 +176,8 @@
         }
     }
 
-    [(fullscreen ? fullscreenRadio : windowedRadio) setState:NSOnState];
+    [windowedRadio setState:(fullscreen ? NSOffState : NSOnState)];
+    [fullscreenRadio setState:(fullscreen ? NSOnState : NSOffState)];
 
     NSButton *bppRadio = bppAutoRadio;
     switch (bpp)  {
@@ -159,11 +187,20 @@
         case 32: bppRadio = bpp32Radio; break;
         default: bppRadio = bppAutoRadio; break;
     }
-    [bppRadio setState:NSOnState];
+    {
+        NSButton *bppRadios[5] = { bppAutoRadio, bpp8Radio, bpp16Radio, bpp24Radio, bpp32Radio };
+        int i;
+        for (i = 0; i < 5; i++)
+            [bppRadios[i] setState:(bppRadios[i] == bppRadio) ? NSOnState : NSOffState];
+    }
 
     if (detail < 1) detail = 1;
     if (detail > 6) detail = 6;
-    [detailRadios[detail - 1] setState:NSOnState];
+    {
+        int i;
+        for (i = 0; i < 6; i++)
+            [detailRadios[i] setState:(i == detail - 1) ? NSOnState : NSOffState];
+    }
 }
 
 - (void)saveToIni
