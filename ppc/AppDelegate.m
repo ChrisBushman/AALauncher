@@ -197,7 +197,13 @@ static NSString *DefaultBinary(NSString *name)
 - (void)startServer:(id)sender
 {
     NSString *portValue = [[portField stringValue] stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
-    NSMutableArray *args = [NSMutableArray array];
+    /* --console: launchProcess uses NSTask, which leaves AAServer with no
+       controlling terminal at all -- with no flag, its output goes
+       nowhere and it shows up as an anonymous background process with no
+       visible window. The flag tells AAServer to relaunch itself into a
+       real Terminal.app window; harmless no-op on builds where a console
+       already exists. */
+    NSMutableArray *args = [NSMutableArray arrayWithObject:@"--console"];
     if ([portValue length])
         [args addObject:portValue];
     [self launchProcess:serverBinary arguments:args];

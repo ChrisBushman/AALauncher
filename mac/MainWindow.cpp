@@ -131,7 +131,13 @@ bool MainWindow::launchProcess(const QString &binaryPath, const QStringList &arg
 
 void MainWindow::onStartServer()
 {
-    QStringList args;
+    /* --console: AAServer is spawned here via QProcess::startDetached(),
+       which leaves it with no controlling terminal at all -- with no
+       flag, its output goes nowhere and it shows up as an anonymous
+       background process with no visible window. The flag tells AAServer
+       to relaunch itself into a real Terminal.app window; harmless no-op
+       on platforms/builds where a console already exists. */
+    QStringList args = {"--console"};
     QString port = m_portEdit->text().trimmed();
     if (!port.isEmpty())
         args << port;
