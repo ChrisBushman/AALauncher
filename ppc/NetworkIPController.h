@@ -19,6 +19,14 @@
     NSString     *result;
     NSString     *resultPort;
     BOOL          discoverySocketShouldStop;
+    /* host:port combos already added via addDiscoveredServer: -- a
+       defensive guard matching the equivalent one in mac/NetworkIPDialog
+       (whose discovery client resends its probe and reliably gets
+       several replies from the same server); this one only sends a
+       single probe, but duplicate delivery isn't impossible on some
+       networks, and this keeps the two launchers' list behavior
+       consistent either way. */
+    NSMutableSet *discoveredHostPorts;
 }
 
 - (NSString *)runModal;

@@ -29,10 +29,29 @@ void ServerDiscovery::start(int timeoutMs)
     m_socket->writeDatagram(kRequestMagic, strlen(kRequestMagic),
                              QHostAddress::Broadcast, kDiscoveryPort);
 
+    /* One broadcast probe isn't reliable enough on its own -- broadcast
+       frames don't get the link-layer ACK/retry unicast traffic does on
+       WiFi, so a single lost packet here means total failure for this
+       attempt (confirmed intermittent in practice). Resend on an interval
+       until the overall timeout, same "retry within a bounded window"
+       approach already used for the game's own connect handshake
+       (IPXConnectToServer). Harmless if a reply already arrived --
+       AAServer's DiscoveryServerLoop just answers again, and
+       NetworkIPDialog::onServerDiscovered dedupes by host:port. */
+    m_resendTimer = new QTimer(this);
+    connect(m_resendTimer, &QTimer::timeout, this, &ServerDiscovery::onResend);
+    m_resendTimer->start(300);
+
     m_timer = new QTimer(this);
     m_timer->setSingleShot(true);
     connect(m_timer, &QTimer::timeout, this, &ServerDiscovery::onTimeout);
     m_timer->start(timeoutMs);
+}
+
+void ServerDiscovery::onResend()
+{
+    m_socket->writeDatagram(kRequestMagic, strlen(kRequestMagic),
+                             QHostAddress::Broadcast, kDiscoveryPort);
 }
 
 void ServerDiscovery::onReadyRead()
@@ -64,6 +83,7 @@ void ServerDiscovery::onReadyRead()
 
 void ServerDiscovery::onTimeout()
 {
+    m_resendTimer->stop();
     m_socket->close();
     emit finished();
     deleteLater();

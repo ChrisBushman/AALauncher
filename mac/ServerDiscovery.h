@@ -26,8 +26,10 @@ signals:
 private slots:
     void onReadyRead();
     void onTimeout();
+    void onResend();
 
 private:
     QUdpSocket *m_socket = nullptr;
     QTimer *m_timer = nullptr;
+    QTimer *m_resendTimer = nullptr;
 };

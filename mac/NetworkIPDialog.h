@@ -4,6 +4,8 @@
 #include <QLineEdit>
 #include <QListWidget>
 #include <QPushButton>
+#include <QSet>
+#include <QString>
 
 // "Join Network Game" dialog: pick a saved or LAN-discovered server from a
 // list, or type a host/IP + port directly. See ServerList.h (saved
@@ -33,4 +35,11 @@ private:
     QLineEdit   *m_portEdit = nullptr;
     QPushButton *m_connectBtn = nullptr;
     QPushButton *m_saveBtn = nullptr;
+
+    /* host:port combos already added via onServerDiscovered -- discovery
+       resends its probe every 300ms over a 1.5s window (see
+       ServerDiscovery.cpp) to survive a single lost broadcast, so the
+       same server legitimately answers more than once. Without this,
+       every reply added its own row. */
+    QSet<QString> m_discoveredHostPorts;
 };

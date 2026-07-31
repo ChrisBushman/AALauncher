@@ -2,6 +2,7 @@
 #import "DisplaySettingsController.h"
 #import "NetworkIPController.h"
 #import "ScriptCompilerController.h"
+#import <stdlib.h>
 
 static NSString *DefaultBinary(NSString *name)
 {
@@ -13,8 +14,25 @@ static NSString *DefaultBinary(NSString *name)
     return [dir stringByAppendingPathComponent:name];
 }
 
+/* Wraps a path/argument in single quotes for embedding in a /bin/sh -c
+   script, escaping any literal single quotes it contains.
+   stringByReplacingOccurrencesOfString:withString: is a 10.5+ addition --
+   not available on this Tiger/10.4 target -- so this uses
+   NSMutableString's replaceOccurrencesOfString:withString:options:range:
+   instead, which has been part of Foundation since long before 10.4. */
+static NSString *ShellQuote(NSString *s)
+{
+    NSMutableString *escaped = [NSMutableString stringWithString:s];
+    [escaped replaceOccurrencesOfString:@"'"
+                              withString:@"'\\''"
+                                 options:0
+                                   range:NSMakeRange(0, [escaped length])];
+    return [NSString stringWithFormat:@"'%@'", escaped];
+}
+
 @interface AppDelegate (Private)
 - (BOOL)launchProcess:(NSString *)binaryPath arguments:(NSArray *)args;
+- (BOOL)launchProcessAfterQuit:(NSString *)binaryPath arguments:(NSArray *)args;
 @end
 
 @implementation AppDelegate
@@ -194,6 +212,73 @@ static NSString *DefaultBinary(NSString *name)
     return YES;
 }
 
+/* Real Tiger hardware: AA dies immediately on launch whenever it's spawned
+   as a child of this still-running Cocoa app -- confirmed via AA's own
+   inherited stderr showing "CFMessagePort: bootstrap_register(): failed"/
+   "CFMessagePortCreateLocal failed" and AA exiting before it ever reaches
+   its own code (no RESSCALE/version banner, no connect attempt reaching
+   the server). AA inherits this launcher's Mach bootstrap namespace as an
+   NSTask child, and whatever this launcher's own Cocoa/AppKit session is
+   still holding in it collides with AA's own registration attempt. A
+   fixed delay before this launcher calls -terminate: does NOT fix this
+   (confirmed) -- the parent doesn't release its claim gradually, it holds
+   it until it has *fully* exited, so any delay short of that is
+   equivalent to none. Instead of guessing at a delay, exec a tiny shell
+   wrapper that actively polls for this launcher's own pid to actually
+   disappear before it execs AA -- by the time that's true, this process
+   (and whatever it was holding) is completely gone, no race window left
+   to lose. -terminate: is called immediately after this returns; the
+   wrapper survives as an independent (reparented) process since exiting
+   a parent doesn't kill already-launched NSTask children. */
+- (BOOL)launchProcessAfterQuit:(NSString *)binaryPath arguments:(NSArray *)args
+{
+    pid_t myPid = [[NSProcessInfo processInfo] processIdentifier];
+    NSString *workDir = [binaryPath stringByDeletingLastPathComponent];
+    NSString *libDir = [workDir stringByAppendingPathComponent:@"lib"];
+
+    NSMutableString *script = [NSMutableString string];
+    [script appendFormat:@"while kill -0 %d 2>/dev/null; do sleep 0.05; done; ", (int)myPid];
+    [script appendFormat:@"cd %@ || exit 1; ", ShellQuote(workDir)];
+    [script appendFormat:@"DYLD_LIBRARY_PATH=%@:\"$DYLD_LIBRARY_PATH\" exec %@",
+        ShellQuote(libDir), ShellQuote(binaryPath)];
+    /* Classic indexed loop, not fast enumeration (for...in) -- an
+       Objective-C 2.0 / 10.5+ addition not available on this Tiger/10.4
+       toolchain. */
+    {
+        unsigned int i, count = [args count];
+        for (i = 0; i < count; i++)  {
+            [script appendFormat:@" %@", ShellQuote([args objectAtIndex:i])];
+        }
+    }
+
+    /* AA's own stdout/stderr otherwise go nowhere visible when launched
+       this way (this launcher itself has no controlling terminal when
+       double-clicked, so there's nothing for a plain inherited fd to
+       land in) -- capture unconditionally so any printf/DebugCheck output
+       from a failure that *doesn't* produce a CrashReporter entry (a
+       clean exit()/abort() from a failed assertion, as opposed to an
+       actual EXC_BAD_ACCESS) is still visible after the fact. */
+    [script appendString:@" > \"$HOME/Desktop/AA-console.log\" 2>&1"];
+
+    NSTask *task = [[[NSTask alloc] init] autorelease];
+    [task setLaunchPath:@"/bin/sh"];
+    [task setArguments:[NSArray arrayWithObjects:@"-c", script, nil]];
+
+    @try  {
+        [task launch];
+    }
+    @catch (NSException *e)  {
+        NSAlert *alert = [NSAlert alertWithMessageText:@"Launch Error"
+                                          defaultButton:@"OK"
+                                        alternateButton:nil
+                                            otherButton:nil
+                              informativeTextWithFormat:@"Failed to launch: %@ (%@)", binaryPath, [e reason]];
+        [alert runModal];
+        return NO;
+    }
+    return YES;
+}
+
 - (void)startServer:(id)sender
 {
     NSString *portValue = [[portField stringValue] stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
@@ -220,14 +305,33 @@ static NSString *DefaultBinary(NSString *name)
     NSMutableArray *args = [NSMutableArray arrayWithObject:ip];
     if ([ipPort length])
         [args addObject:ipPort];
-    if ([self launchProcess:aaBinary arguments:args])
-        [NSApp terminate:nil];
+    if ([self launchProcessAfterQuit:aaBinary arguments:args])
+        [self quitImmediately];
 }
 
 - (void)playSinglePlayer:(id)sender
 {
-    if ([self launchProcess:aaBinary arguments:[NSArray array]])
-        [NSApp terminate:nil];
+    if ([self launchProcessAfterQuit:aaBinary arguments:[NSArray array]])
+        [self quitImmediately];
+}
+
+/* [NSApp terminate:nil] runs this app's normal Cocoa teardown -- for a
+   window closing normally (the Exit button, exitApplication: below)
+   that's exactly right. But right after spawning AA to hand off to it,
+   confirmed on real Tiger hardware that this same teardown crashes
+   (EXC_BAD_ACCESS in -[NSCell dealloc] during
+   -[NSApplication _deallocHardCore:]'s pool-draining walk of every
+   window/control) -- this app's entire UI is built by hand in code, no
+   NIB/XIB, and Tiger's AppKit has real, documented deallocation-order
+   issues with programmatically-built cells/controls that NIB-loaded ones
+   don't hit (matches the visible symptom: the window does its normal
+   fade-out close animation, then crashes mid-teardown). None of that
+   matters here -- once AA has been launched there is nothing left this
+   process needs to clean up gracefully, so skip AppKit's own shutdown
+   entirely and let the kernel reclaim everything at once. */
+- (void)quitImmediately
+{
+    exit(0);
 }
 
 - (void)openScriptCompiler:(id)sender

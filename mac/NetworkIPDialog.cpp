@@ -121,5 +121,9 @@ void NetworkIPDialog::onSaveClicked()
 
 void NetworkIPDialog::onServerDiscovered(const QString &host, quint16 port, const QString &name)
 {
+    QString key = QString("%1:%2").arg(host).arg(port);
+    if (m_discoveredHostPorts.contains(key))
+        return;
+    m_discoveredHostPorts.insert(key);
     addListRow(QString("%1 [LAN]").arg(name), host, QString::number(port));
 }

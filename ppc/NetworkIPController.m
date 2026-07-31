@@ -127,6 +127,7 @@
         result = nil;
         resultPort = nil;
         discoverySocketShouldStop = NO;
+        discoveredHostPorts = [[NSMutableSet alloc] init];
 
         [self loadSavedServers];
         [self startDiscovery];
@@ -146,6 +147,7 @@
     [panel release];
     [result release];
     [resultPort release];
+    [discoveredHostPorts release];
     [super dealloc];
 }
 
@@ -331,7 +333,19 @@
                 NSString *port = [NSString stringWithUTF8String:rest];
                 NSString *name = [NSString stringWithUTF8String:(colon + 1)];
                 NSString *host = [NSString stringWithUTF8String:inet_ntoa(fromAddr.sin_addr)];
-                NSArray *info = [NSArray arrayWithObjects:name, host, port, nil];
+                /* Explicitly owned (alloc/init, not autoreleased) rather
+                   than relying on performSelectorOnMainThread: to retain
+                   it for us across the thread hop -- confirmed on real
+                   Tiger hardware that it doesn't reliably: this function
+                   returns and drains its own autorelease pool well before
+                   the main thread's run loop gets around to invoking the
+                   async (waitUntilDone:NO) call below, deallocating an
+                   autoreleased array out from under it (use-after-free on
+                   the main thread once it finally ran: "selector not
+                   recognized" on reused memory, then double-free on
+                   teardown). addDiscoveredServer: below releases this once
+                   it's done with it. */
+                NSArray *info = [[NSArray alloc] initWithObjects:name, host, port, nil];
 
                 /* The 4-arg (modes:) form, not the plain 3-arg
                    performSelectorOnMainThread:withObject:waitUntilDone: --
@@ -359,10 +373,17 @@
     NSString *name = [nameHostPort objectAtIndex:0];
     NSString *host = [nameHostPort objectAtIndex:1];
     NSString *port = [nameHostPort objectAtIndex:2];
-    NSDictionary *entry = [NSDictionary dictionaryWithObjectsAndKeys:
-        [name stringByAppendingString:@" [LAN]"], @"name", host, @"host", port, @"port", nil];
-    [serverEntries addObject:entry];
-    [serverTable reloadData];
+
+    NSString *key = [NSString stringWithFormat:@"%@:%@", host, port];
+    if (![discoveredHostPorts containsObject:key])  {
+        [discoveredHostPorts addObject:key];
+        NSDictionary *entry = [NSDictionary dictionaryWithObjectsAndKeys:
+            [name stringByAppendingString:@" [LAN]"], @"name", host, @"host", port, @"port", nil];
+        [serverEntries addObject:entry];
+        [serverTable reloadData];
+    }
+    /* Balances the explicit alloc/init in runDiscovery -- see its comment. */
+    [nameHostPort release];
 }
 
 - (NSString *)runModal
