@@ -37,3 +37,6 @@ AALauncher/Win32/
 .vscode/
 .claude/
 spec/
+mac/stage/
+mac/build/
+mac/AALauncher-macOS.zip
