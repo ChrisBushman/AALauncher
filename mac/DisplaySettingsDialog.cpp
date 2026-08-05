@@ -1,6 +1,7 @@
 #include "DisplaySettingsDialog.h"
 
 #include <QButtonGroup>
+#include <QCheckBox>
 #include <QDialogButtonBox>
 #include <QDir>
 #include <QFile>
@@ -68,6 +69,10 @@ DisplaySettingsDialog::DisplaySettingsDialog(const QString &aaBinaryPath, QWidge
     }
     vLayout->addWidget(detailGroup);
 
+    m_vsyncCheck = new QCheckBox(
+        "Vertical sync (reduces tearing; caps FPS to the refresh rate)", this);
+    vLayout->addWidget(m_vsyncCheck);
+
     QLabel *note = new QLabel(
         "Applied the next time you start a single-player or network game.",
         this);
@@ -97,6 +102,7 @@ void DisplaySettingsDialog::loadFromIni()
     int fullscreen = 1;
     int bpp = 0;
     int detail = 2;
+    int vsync = 0;      // matches RESSCALE.C's default (off)
 
     QFile f(iniPath());
     if (f.open(QIODevice::ReadOnly | QIODevice::Text)) {
@@ -118,6 +124,8 @@ void DisplaySettingsDialog::loadFromIni()
                 bpp = intValue;
             else if (key == "detail")
                 detail = intValue;
+            else if (key == "vsync")
+                vsync = intValue;
         }
     }
 
@@ -136,6 +144,8 @@ void DisplaySettingsDialog::loadFromIni()
     if (detail < 1) detail = 1;
     if (detail > 6) detail = 6;
     m_detailRadios[detail - 1]->setChecked(true);
+
+    m_vsyncCheck->setChecked(vsync != 0);
 }
 
 void DisplaySettingsDialog::onOk()
@@ -170,6 +180,8 @@ void DisplaySettingsDialog::saveToIni()
         }
     }
 
+    int vsync = m_vsyncCheck->isChecked() ? 1 : 0;
+
     // Window size tier per detail level -- capped at the level-3 size for
     // levels 4-6 rather than continuing to grow the window: beyond that
     // point higher detail is about render sharpness, not needing an even
@@ -192,7 +204,8 @@ void DisplaySettingsDialog::saveToIni()
                 trimmed.startsWith("bpp=") ||
                 trimmed.startsWith("detail=") ||
                 trimmed.startsWith("width=") ||
-                trimmed.startsWith("height=");
+                trimmed.startsWith("height=") ||
+                trimmed.startsWith("vsync=");
             if (!isManaged)
                 keptLines << line;
         }
@@ -209,4 +222,5 @@ void DisplaySettingsDialog::saveToIni()
     out << "detail=" << detail << "\n";
     out << "width=" << width << "\n";
     out << "height=" << height << "\n";
+    out << "vsync=" << vsync << "\n";
 }

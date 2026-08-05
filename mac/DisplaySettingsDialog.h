@@ -1,5 +1,6 @@
 #pragma once
 
+#include <QCheckBox>
 #include <QDialog>
 #include <QRadioButton>
 
@@ -37,4 +38,9 @@ private:
     QRadioButton *m_bpp32Radio = nullptr;
 
     QRadioButton *m_detailRadios[6] = { nullptr };
+
+    // macOS/Linux (sdl12-compat) only: writes vsync= to resolution.ini, which
+    // RESSCALE maps to SDL12COMPAT_SYNC_TO_VBLANK.  No such control on the
+    // real-SDL-1.2 launchers (Windows/PPC/O2), which have no runtime toggle.
+    QCheckBox *m_vsyncCheck = nullptr;
 };
