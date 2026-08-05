@@ -2,6 +2,9 @@
 
 #include <sys/types.h>
 #include <sys/socket.h>
+#include <sys/time.h>       /* struct timeval (used below); the 10.3 SDK
+                               doesn't pull it in transitively the way the
+                               10.4 SDK's headers do */
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <unistd.h>
