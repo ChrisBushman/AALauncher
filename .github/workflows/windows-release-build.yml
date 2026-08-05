@@ -53,5 +53,5 @@ jobs:
           unzip -q "$asset"
           cp "AALauncher/Release/AALauncher.exe" "AALauncher-Windows/AALauncher.exe"
           rm -f "$asset"
-          zip -rqy "$asset" "AALauncher-Windows"
+          7z a -tzip "$asset" "AALauncher-Windows" >/dev/null
           gh release upload "${{ inputs.tag }}" "$asset" --clobber
