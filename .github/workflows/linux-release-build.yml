@@ -20,6 +20,13 @@ name: Linux release build
 # every other platform's release.
 on:
   workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag to publish the asset to (blank = build a CI artifact only, don't publish)"
+        required: false
+
+permissions:
+  contents: write
 
 jobs:
   build:
@@ -84,3 +91,9 @@ jobs:
           name: AALauncher-Linux
           path: AALauncher-Linux.tar.gz
           if-no-files-found: error
+
+      - name: Publish to release
+        if: ${{ inputs.tag != '' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "${{ inputs.tag }}" AALauncher-Linux.tar.gz --clobber
