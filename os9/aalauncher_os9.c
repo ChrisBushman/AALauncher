@@ -12,6 +12,9 @@
  * Types come from the MacHeaders prefix force-included by AALauncher_OS9_Prefix.h.
  */
 #include <Processes.h>
+#include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
 
 /* ------------------------------------------------------------------ menus */
 #define kAppleMenuID    128
@@ -163,6 +166,223 @@ static void DrawContent(void)
     DrawControls(gWindow);
 }
 
+/* -------------------------------------------------- Display Settings dialog
+ * Reads/writes resolution.ini in the launcher's own folder (= the game's
+ * folder, since they ship together), which the game reads for windowed/
+ * fullscreen, color depth, level-of-detail (also window size), and vsync.
+ * Matches the Qt launcher's DisplaySettingsDialog (merge-preserving every
+ * other line in the file).
+ */
+typedef struct {
+    int fullscreen;   /* 1/0                */
+    int bpp;          /* 0=auto, 8/16/24/32 */
+    int detail;       /* 1..6               */
+    int vsync;        /* 1/0                */
+} ResSettings;
+
+/* Read one line, breaking on \r, \n, or \r\n (OS 9 config files are CR- or
+   LF-terminated); strips the terminator. Returns 0 at EOF. */
+static int ReadLine(FILE *f, char *buf, int max)
+{
+    int c, n = 0;
+    c = fgetc(f);
+    if (c == EOF)
+        return 0;
+    while (c != EOF && c != '\r' && c != '\n') {
+        if (n < max - 1)
+            buf[n++] = (char)c;
+        c = fgetc(f);
+    }
+    if (c == '\r') {                 /* swallow a following \n of a \r\n pair */
+        int c2 = fgetc(f);
+        if (c2 != '\n' && c2 != EOF)
+            ungetc(c2, f);
+    }
+    buf[n] = '\0';
+    return 1;
+}
+
+static int StartsWith(const char *s, const char *p)
+{
+    return strncmp(s, p, strlen(p)) == 0;
+}
+
+static int IsManagedKey(const char *line)
+{
+    return StartsWith(line, "fullscreen=") || StartsWith(line, "bpp=") ||
+           StartsWith(line, "detail=")     || StartsWith(line, "width=") ||
+           StartsWith(line, "height=")     || StartsWith(line, "vsync=");
+}
+
+static void ReadRes(ResSettings *s)
+{
+    FILE *f;
+    char line[256];
+    char *eq;
+    /* defaults match RESSCALE.C's own compiled-in defaults */
+    s->fullscreen = 1; s->bpp = 0; s->detail = 2; s->vsync = 0;
+    f = fopen("resolution.ini", "rb");
+    if (f == NULL)
+        return;
+    while (ReadLine(f, line, sizeof(line))) {
+        eq = strchr(line, '=');
+        if (eq == NULL)
+            continue;
+        *eq = '\0';
+        {
+            int v = atoi(eq + 1);
+            if      (strcmp(line, "fullscreen") == 0) s->fullscreen = v;
+            else if (strcmp(line, "bpp") == 0)        s->bpp = v;
+            else if (strcmp(line, "detail") == 0)     s->detail = v;
+            else if (strcmp(line, "vsync") == 0)      s->vsync = v;
+        }
+    }
+    fclose(f);
+}
+
+static void WriteRes(const ResSettings *s)
+{
+    /* window size tier per detail level, capped at level-3 (all 4:3) */
+    static const int W[6] = { 640, 1024, 1280, 1280, 1280, 1280 };
+    static const int H[6] = { 480,  768,  960,  960,  960,  960 };
+    char *kept[128];
+    int nkept = 0, i;
+    int det = s->detail;
+    FILE *in, *out;
+    char line[256];
+
+    if (det < 1) det = 1;
+    if (det > 6) det = 6;
+
+    in = fopen("resolution.ini", "rb");
+    if (in != NULL) {
+        while (ReadLine(in, line, sizeof(line))) {
+            if (IsManagedKey(line))
+                continue;
+            if (nkept < 128) {
+                kept[nkept] = (char *)malloc(strlen(line) + 1);
+                if (kept[nkept] != NULL) {
+                    strcpy(kept[nkept], line);
+                    nkept++;
+                }
+            }
+        }
+        fclose(in);
+    }
+
+    out = fopen("resolution.ini", "wb");
+    if (out == NULL) {
+        for (i = 0; i < nkept; i++) free(kept[i]);
+        return;
+    }
+    for (i = 0; i < nkept; i++) {
+        fprintf(out, "%s\n", kept[i]);
+        free(kept[i]);
+    }
+    fprintf(out, "fullscreen=%d\n", s->fullscreen);
+    fprintf(out, "bpp=%d\n",        s->bpp);
+    fprintf(out, "detail=%d\n",     det);
+    fprintf(out, "width=%d\n",      W[det - 1]);
+    fprintf(out, "height=%d\n",     H[det - 1]);
+    fprintf(out, "vsync=%d\n",      s->vsync);
+    fclose(out);
+}
+
+static short GetDItemValue(DialogPtr d, short item)
+{
+    short type; Handle h; Rect box;
+    GetDialogItem(d, item, &type, &h, &box);
+    return GetControlValue((ControlHandle)h);
+}
+
+static void SetDItemValue(DialogPtr d, short item, short val)
+{
+    short type; Handle h; Rect box;
+    GetDialogItem(d, item, &type, &h, &box);
+    SetControlValue((ControlHandle)h, val);
+}
+
+static void SetRadioGroup(DialogPtr d, short first, short last, short selected)
+{
+    short i;
+    for (i = first; i <= last; i++)
+        SetDItemValue(d, i, (short)((i == selected) ? 1 : 0));
+}
+
+/* DITL 129 item numbers */
+#define kDsOK        1
+#define kDsCancel    2
+#define kDsWindowed  4
+#define kDsFullscr   5
+#define kDsBppAuto   7
+#define kDsBpp8      8
+#define kDsBpp16     9
+#define kDsBpp24     10
+#define kDsBpp32     11
+#define kDsDetail1   13   /* ..18 for detail 1..6 (item = 12 + detail) */
+#define kDsDetail6   18
+#define kDsVsync     19
+
+static void DoDisplaySettings(void)
+{
+    DialogPtr d;
+    ResSettings s;
+    short item, bppItem, detailItem;
+    Boolean done = false;
+
+    ReadRes(&s);
+
+    d = GetNewDialog(129, NULL, (WindowPtr)-1);
+    if (d == NULL) {
+        SysBeep(1);
+        return;
+    }
+    SetDialogDefaultItem(d, kDsOK);
+
+    SetRadioGroup(d, kDsWindowed, kDsFullscr, s.fullscreen ? kDsFullscr : kDsWindowed);
+    bppItem = kDsBppAuto;
+    if      (s.bpp == 8)  bppItem = kDsBpp8;
+    else if (s.bpp == 16) bppItem = kDsBpp16;
+    else if (s.bpp == 24) bppItem = kDsBpp24;
+    else if (s.bpp == 32) bppItem = kDsBpp32;
+    SetRadioGroup(d, kDsBppAuto, kDsBpp32, bppItem);
+    detailItem = (short)(12 + (s.detail < 1 ? 1 : (s.detail > 6 ? 6 : s.detail)));
+    SetRadioGroup(d, kDsDetail1, kDsDetail6, detailItem);
+    SetDItemValue(d, kDsVsync, (short)(s.vsync ? 1 : 0));
+
+    ShowWindow(GetDialogWindow(d));
+
+    while (!done) {
+        ModalDialog(NULL, &item);
+        if (item == kDsOK) {
+            short i;
+            s.fullscreen = GetDItemValue(d, kDsFullscr) ? 1 : 0;
+            if      (GetDItemValue(d, kDsBpp8))  s.bpp = 8;
+            else if (GetDItemValue(d, kDsBpp16)) s.bpp = 16;
+            else if (GetDItemValue(d, kDsBpp24)) s.bpp = 24;
+            else if (GetDItemValue(d, kDsBpp32)) s.bpp = 32;
+            else                                 s.bpp = 0;
+            s.detail = 2;
+            for (i = kDsDetail1; i <= kDsDetail6; i++)
+                if (GetDItemValue(d, i)) { s.detail = i - 12; break; }
+            s.vsync = GetDItemValue(d, kDsVsync) ? 1 : 0;
+            WriteRes(&s);
+            done = true;
+        } else if (item == kDsCancel) {
+            done = true;
+        } else if (item >= kDsWindowed && item <= kDsFullscr) {
+            SetRadioGroup(d, kDsWindowed, kDsFullscr, item);
+        } else if (item >= kDsBppAuto && item <= kDsBpp32) {
+            SetRadioGroup(d, kDsBppAuto, kDsBpp32, item);
+        } else if (item >= kDsDetail1 && item <= kDsDetail6) {
+            SetRadioGroup(d, kDsDetail1, kDsDetail6, item);
+        } else if (item == kDsVsync) {
+            SetDItemValue(d, kDsVsync, (short)(GetDItemValue(d, kDsVsync) ? 0 : 1));
+        }
+    }
+    DisposeDialog(d);
+}
+
 /* ------------------------------------------------------------- event loop */
 static void DoMenuChoice(long choice)
 {
@@ -187,7 +407,7 @@ static void DoMenuChoice(long choice)
             break;
         case kOptionsMenuID:
             if (item == kDisplayItem)
-                SysBeep(1);   /* Display Settings dialog -- later phase */
+                DoDisplaySettings();
             break;
     }
     HiliteMenu(0);

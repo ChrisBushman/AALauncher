@@ -56,3 +56,37 @@ resource 'vers' (1) {
     "1.0",
     "AALauncher 1.0 for Mac OS 9"
 };
+
+/* ---- Display Settings dialog (writes resolution.ini) -------------------- */
+resource 'DLOG' (129) {
+    {80, 80, 80 + 300, 80 + 360},
+    movableDBoxProc, invisible, goAway, 0x0,
+    129,
+    "Display Settings",
+    alertPositionMainScreen
+};
+
+resource 'DITL' (129) {
+    {   /* Mac Rect order is {top, left, bottom, right} */
+        /* [1] OK */          {262, 280, 286, 345}, Button { enabled, "OK" };
+        /* [2] Cancel */      {262, 195, 286, 265}, Button { enabled, "Cancel" };
+        /* [3] Display: */    {10, 12, 26, 200},    StaticText { disabled, "Display:" };
+        /* [4] Windowed */    {28, 20, 44, 150},    RadioButton { enabled, "Windowed" };
+        /* [5] Fullscreen */  {28, 160, 44, 300},   RadioButton { enabled, "Fullscreen" };
+        /* [6] Color Depth:*/ {52, 12, 68, 200},    StaticText { disabled, "Color Depth:" };
+        /* [7] Auto */        {70, 20, 86, 120},    RadioButton { enabled, "Auto" };
+        /* [8] 8-bit */       {88, 20, 104, 120},   RadioButton { enabled, "8-bit" };
+        /* [9] 16-bit */      {70, 130, 86, 220},   RadioButton { enabled, "16-bit" };
+        /* [10] 24-bit */     {88, 130, 104, 220},  RadioButton { enabled, "24-bit" };
+        /* [11] 32-bit */     {70, 230, 86, 330},   RadioButton { enabled, "32-bit" };
+        /* [12] Detail: */    {112, 12, 128, 340},  StaticText { disabled, "Level of Detail (sets window size):" };
+        /* [13] 1 */          {130, 20, 146, 210},  RadioButton { enabled, "1 (fastest, 640x480)" };
+        /* [14] 2 */          {148, 20, 164, 210},  RadioButton { enabled, "2 (1024x768)" };
+        /* [15] 3 */          {166, 20, 182, 210},  RadioButton { enabled, "3 (1280x960)" };
+        /* [16] 4 */          {130, 220, 146, 340}, RadioButton { enabled, "4" };
+        /* [17] 5 */          {148, 220, 164, 340}, RadioButton { enabled, "5" };
+        /* [18] 6 */          {166, 220, 182, 340}, RadioButton { enabled, "6 (sharpest)" };
+        /* [19] vsync */      {190, 20, 206, 340},  CheckBox { enabled, "Vertical sync (caps FPS to refresh rate)" };
+        /* [20] note */       {212, 12, 244, 340},  StaticText { disabled, "Applied next time you start a game." };
+    }
+};
