@@ -383,6 +383,82 @@ static void DoDisplaySettings(void)
     DisposeDialog(d);
 }
 
+/* ----------------------------------------------------- Network Game dialog
+ * Writes aanet.ini in the launcher's folder (= the game's folder) with the
+ * server address, then launches AA -- which reads it (classic Mac has no
+ * argv). Single player deletes aanet.ini so no stale address forces it online.
+ */
+static void WriteAANet(ConstStr255Param host, ConstStr255Param port)
+{
+    FILE *f;
+    char h[256], p[256];
+    short i;
+    for (i = 0; i < host[0]; i++) h[i] = (char)host[i + 1];
+    h[host[0]] = '\0';
+    for (i = 0; i < port[0]; i++) p[i] = (char)port[i + 1];
+    p[port[0]] = '\0';
+    f = fopen("aanet.ini", "wb");
+    if (f == NULL)
+        return;
+    fprintf(f, "server=%s\n", h);
+    if (p[0] != '\0')
+        fprintf(f, "port=%s\n", p);
+    fclose(f);
+}
+
+static void DeleteAANet(void)
+{
+    remove("aanet.ini");
+}
+
+/* DITL 130 items */
+#define kNwConnect  1
+#define kNwCancel   2
+#define kNwHost     4
+#define kNwPort     6
+
+static void DoNetworkGame(void)
+{
+    DialogPtr d;
+    short item, type;
+    Handle h;
+    Rect box;
+    Str255 host, port;
+
+    d = GetNewDialog(130, NULL, (WindowPtr)-1);
+    if (d == NULL) {
+        SysBeep(1);
+        return;
+    }
+    SetDialogDefaultItem(d, kNwConnect);
+    GetDialogItem(d, kNwPort, &type, &h, &box);
+    SetDialogItemText(h, "\p21300");
+    SelectDialogItemText(d, kNwHost, 0, 0);
+    ShowWindow(GetDialogWindow(d));
+
+    for (;;) {
+        ModalDialog(NULL, &item);
+        if (item == kNwConnect) {
+            GetDialogItem(d, kNwHost, &type, &h, &box);
+            GetDialogItemText(h, host);
+            GetDialogItem(d, kNwPort, &type, &h, &box);
+            GetDialogItemText(h, port);
+            if (host[0] == 0) {          /* need a host/IP */
+                SysBeep(1);
+                continue;
+            }
+            WriteAANet(host, port);
+            DisposeDialog(d);
+            DoLaunch("\pAA");            /* game reads aanet.ini and joins */
+            gDone = true;               /* close the launcher, like the Qt version */
+            return;
+        } else if (item == kNwCancel) {
+            DisposeDialog(d);
+            return;
+        }
+    }
+}
+
 /* ------------------------------------------------------------- event loop */
 static void DoMenuChoice(long choice)
 {
@@ -415,10 +491,14 @@ static void DoMenuChoice(long choice)
 
 static void DoButton(ControlHandle ctl)
 {
-    if (ctl == gBtnSingle)       DoLaunch("\pAmuletsAndArmor");
+    if (ctl == gBtnSingle) {
+        DeleteAANet();               /* single player: no stale server address */
+        DoLaunch("\pAA");
+        gDone = true;                /* close the launcher after launching, like Qt */
+    }
     else if (ctl == gBtnServer)  DoLaunch("\pAAServer");
     else if (ctl == gBtnScript)  DoLaunch("\pAAScriptCompiler");
-    else if (ctl == gBtnNetwork) SysBeep(1);   /* Network dialog -- later phase */
+    else if (ctl == gBtnNetwork) DoNetworkGame();
     else if (ctl == gBtnExit)    gDone = true;
 }
 

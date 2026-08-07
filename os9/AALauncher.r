@@ -90,3 +90,23 @@ resource 'DITL' (129) {
         /* [20] note */       {212, 12, 244, 340},  StaticText { disabled, "Applied next time you start a game." };
     }
 };
+
+/* ---- Network Game dialog (writes aanet.ini, then launches AA) ----------- */
+resource 'DLOG' (130) {
+    {90, 90, 90 + 140, 90 + 380},
+    movableDBoxProc, invisible, goAway, 0x0,
+    130,
+    "Play Network Game",
+    alertPositionMainScreen
+};
+
+resource 'DITL' (130) {
+    {   /* {top, left, bottom, right} */
+        /* [1] Connect */  {104, 290, 128, 365}, Button { enabled, "Connect" };
+        /* [2] Cancel */   {104, 200, 128, 275}, Button { enabled, "Cancel" };
+        /* [3] host lbl */ {14, 15, 30, 360},    StaticText { disabled, "Server host or IP address:" };
+        /* [4] host edit */{34, 15, 50, 365},    EditText  { enabled, "" };
+        /* [5] port lbl */ {64, 15, 80, 60},     StaticText { disabled, "Port:" };
+        /* [6] port edit */{62, 62, 78, 140},    EditText  { enabled, "" };
+    }
+};
