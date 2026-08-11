@@ -2,10 +2,12 @@
 #include "DisplaySettingsDialog.h"
 #include "NetworkIPDialog.h"
 #include "ScriptCompilerWindow.h"
+#include "Updater.h"
 
 #include <QAction>
 #include <QApplication>
 #include <QCoreApplication>
+#include <QDesktopServices>
 #include <QDir>
 #include <QFileInfo>
 #include <QFont>
@@ -15,6 +17,10 @@
 #include <QMessageBox>
 #include <QProcess>
 #include <QProcessEnvironment>
+#include <QProgressDialog>
+#include <QPushButton>
+#include <QSettings>
+#include <QTimer>
 #include <QUrl>
 #include <QVBoxLayout>
 #include <QWidget>
@@ -99,6 +105,12 @@ void MainWindow::setupUi()
     QMenu *optionsMenu = menuBar()->addMenu("Options");
     QAction *displaySettingsAction = optionsMenu->addAction("Display Settings...");
     connect(displaySettingsAction, &QAction::triggered, this, &MainWindow::onDisplaySettings);
+    QAction *checkUpdatesAction = optionsMenu->addAction("Check for Updates...");
+    connect(checkUpdatesAction, &QAction::triggered, this, &MainWindow::onCheckForUpdates);
+
+    // A quiet check once at startup: never interrupts on failure or when
+    // already current, and honors a per-version "skip" choice.
+    QTimer::singleShot(0, this, [this] { startUpdateCheck(/*silent=*/true); });
 }
 
 bool MainWindow::launchProcess(const QString &binaryPath, const QStringList &args)
@@ -179,4 +191,121 @@ void MainWindow::onDisplaySettings()
 {
     DisplaySettingsDialog dlg(m_aaBinary, this);
     dlg.exec();
+}
+
+void MainWindow::onCheckForUpdates()
+{
+    startUpdateCheck(/*silent=*/false);
+}
+
+void MainWindow::startUpdateCheck(bool silent)
+{
+    if (!silent && !Updater::isInstalledBundle()) {
+        QMessageBox::information(this, "Check for Updates",
+            "Updating in place only works when running the installed "
+            "Amulets & Armor app. This looks like a development build.");
+        return;
+    }
+    if (!Updater::isInstalledBundle())
+        return;  // silent startup check from a dev build: stay quiet
+
+    if (!m_updater)
+        m_updater = new Updater(this);
+
+    connect(m_updater, &Updater::checkFinished, this,
+            [this, silent](const UpdateInfo &info) {
+        if (info.updateAvailable) {
+            // Respect a prior "Skip This Version" -- but only for the silent
+            // startup check; an explicit menu check always shows the offer.
+            if (silent) {
+                QSettings settings;
+                if (settings.value("updates/skipVersion").toString() == info.latestVersion)
+                    return;
+            }
+            offerUpdate(info);
+        } else if (!silent) {
+            QMessageBox::information(this, "Check for Updates",
+                QString("You're up to date.\n\nAmulets & Armor %1 is the latest version.")
+                    .arg(info.currentVersion.isEmpty() ? info.latestVersion : info.currentVersion));
+        }
+    }, Qt::SingleShotConnection);
+
+    connect(m_updater, &Updater::checkFailed, this, [this, silent](const QString &err) {
+        if (!silent)
+            QMessageBox::warning(this, "Check for Updates",
+                "Couldn't check for updates:\n\n" + err);
+    }, Qt::SingleShotConnection);
+
+    m_updater->checkForUpdates();
+}
+
+void MainWindow::offerUpdate(const UpdateInfo &info)
+{
+    const QString current = info.currentVersion.isEmpty() ? "unknown" : info.currentVersion;
+    QMessageBox box(this);
+    box.setWindowTitle("Update Available");
+    box.setIcon(QMessageBox::Question);
+    box.setText(QString("Amulets & Armor %1 is available.").arg(info.latestVersion));
+    box.setInformativeText(
+        QString("You have version %1.\n\nYour characters, saved games, and "
+                "settings are backed up and carried over automatically.")
+            .arg(current));
+    QPushButton *updateBtn = box.addButton("Update Now", QMessageBox::AcceptRole);
+    QPushButton *notesBtn  = box.addButton("Release Notes", QMessageBox::ActionRole);
+    QPushButton *skipBtn   = box.addButton("Skip This Version", QMessageBox::DestructiveRole);
+    box.addButton("Later", QMessageBox::RejectRole);
+    box.setDefaultButton(updateBtn);
+
+    box.exec();
+
+    if (box.clickedButton() == notesBtn) {
+        if (!info.releaseUrl.isEmpty())
+            QDesktopServices::openUrl(QUrl(info.releaseUrl));
+        // Re-offer after they've looked at the notes.
+        offerUpdate(info);
+        return;
+    }
+    if (box.clickedButton() == skipBtn) {
+        QSettings settings;
+        settings.setValue("updates/skipVersion", info.latestVersion);
+        return;
+    }
+    if (box.clickedButton() != updateBtn)
+        return;  // Later / closed
+
+    // Run the download+install behind a progress dialog.
+    QProgressDialog *progress = new QProgressDialog(
+        "Preparing...", "Cancel", 0, 0, this);
+    progress->setWindowTitle("Updating Amulets & Armor");
+    progress->setWindowModality(Qt::WindowModal);
+    progress->setMinimumDuration(0);
+    progress->setAutoClose(false);
+    progress->setAutoReset(false);
+
+    connect(m_updater, &Updater::statusChanged, progress, &QProgressDialog::setLabelText);
+    connect(m_updater, &Updater::downloadProgress, progress,
+            [progress](qint64 received, qint64 total) {
+        if (total > 0) {
+            progress->setMaximum(static_cast<int>(total / 1024));
+            progress->setValue(static_cast<int>(received / 1024));
+        }
+    });
+    connect(progress, &QProgressDialog::canceled, m_updater, &Updater::cancel);
+
+    connect(m_updater, &Updater::updateFailed, this, [this, progress](const QString &err) {
+        progress->close();
+        progress->deleteLater();
+        if (!err.isEmpty())  // empty == user canceled
+            QMessageBox::critical(this, "Update Failed", err);
+    }, Qt::SingleShotConnection);
+
+    connect(m_updater, &Updater::readyToRelaunch, this, [progress] {
+        progress->close();
+        progress->deleteLater();
+        // Quit so the detached helper can replace the running bundle and
+        // relaunch it. The helper is already spawned and waiting on our PID.
+        QCoreApplication::quit();
+    }, Qt::SingleShotConnection);
+
+    m_updater->performUpdate(info);
 }

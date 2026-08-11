@@ -24,6 +24,8 @@ qt_add_executable(AALauncher
     ServerList.cpp
     ServerDiscovery.h
     ServerDiscovery.cpp
+    Updater.h
+    Updater.cpp
 )
 
 target_link_libraries(AALauncher
