@@ -81,9 +81,9 @@ resource 'DITL' (129) {
         /* [11] 32-bit */     {70, 230, 86, 330},   RadioButton { enabled, "32-bit" };
         /* [12] Detail: */    {112, 12, 128, 340},  StaticText { disabled, "Level of Detail (sets window size):" };
         /* [13] 1 */          {130, 20, 146, 210},  RadioButton { enabled, "1 (fastest, 640x480)" };
-        /* [14] 2 */          {148, 20, 164, 210},  RadioButton { enabled, "2 (1024x768)" };
-        /* [15] 3 */          {166, 20, 182, 210},  RadioButton { enabled, "3 (1280x960)" };
-        /* [16] 4 */          {130, 220, 146, 340}, RadioButton { enabled, "4" };
+        /* [14] 2 */          {148, 20, 164, 210},  RadioButton { enabled, "2 (800x600)" };
+        /* [15] 3 */          {166, 20, 182, 210},  RadioButton { enabled, "3 (1024x768)" };
+        /* [16] 4 */          {130, 220, 146, 340}, RadioButton { enabled, "4 (1280x960)" };
         /* [17] 5 */          {148, 220, 164, 340}, RadioButton { enabled, "5" };
         /* [18] 6 */          {166, 220, 182, 340}, RadioButton { enabled, "6 (sharpest)" };
         /* [19] vsync */      {190, 20, 206, 340},  CheckBox { enabled, "Vertical sync (caps FPS to refresh rate)" };

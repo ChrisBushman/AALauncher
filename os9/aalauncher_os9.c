@@ -247,9 +247,9 @@ static void ReadRes(ResSettings *s)
 
 static void WriteRes(const ResSettings *s)
 {
-    /* window size tier per detail level, capped at level-3 (all 4:3) */
-    static const int W[6] = { 640, 1024, 1280, 1280, 1280, 1280 };
-    static const int H[6] = { 480,  768,  960,  960,  960,  960 };
+    /* window size tier per detail level, capped at level-4 (all 4:3) */
+    static const int W[6] = { 640, 800, 1024, 1280, 1280, 1280 };
+    static const int H[6] = { 480, 600,  768,  960,  960,  960 };
     char *kept[128];
     int nkept = 0, i;
     int det = s->detail;
