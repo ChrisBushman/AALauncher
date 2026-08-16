@@ -178,6 +178,7 @@ typedef struct {
     int bpp;          /* 0=auto, 8/16/24/32 */
     int detail;       /* 1..6               */
     int vsync;        /* 1/0                */
+    int rave;         /* 1=RAVE hardware, 0=software (renderer=) */
 } ResSettings;
 
 /* Read one line, breaking on \r, \n, or \r\n (OS 9 config files are CR- or
@@ -211,7 +212,8 @@ static int IsManagedKey(const char *line)
 {
     return StartsWith(line, "fullscreen=") || StartsWith(line, "bpp=") ||
            StartsWith(line, "detail=")     || StartsWith(line, "width=") ||
-           StartsWith(line, "height=")     || StartsWith(line, "vsync=");
+           StartsWith(line, "height=")     || StartsWith(line, "vsync=") ||
+           StartsWith(line, "renderer=");
 }
 
 static void ReadRes(ResSettings *s)
@@ -220,7 +222,7 @@ static void ReadRes(ResSettings *s)
     char line[256];
     char *eq;
     /* defaults match RESSCALE.C's own compiled-in defaults */
-    s->fullscreen = 1; s->bpp = 0; s->detail = 2; s->vsync = 0;
+    s->fullscreen = 1; s->bpp = 0; s->detail = 2; s->vsync = 0; s->rave = 0;
     f = fopen("resolution.ini", "rb");
     if (f == NULL)
         return;
@@ -235,6 +237,9 @@ static void ReadRes(ResSettings *s)
             else if (strcmp(line, "bpp") == 0)        s->bpp = v;
             else if (strcmp(line, "detail") == 0)     s->detail = v;
             else if (strcmp(line, "vsync") == 0)      s->vsync = v;
+            else if (strcmp(line, "renderer") == 0)
+                s->rave = (strcmp(eq + 1, "rave") == 0 ||
+                           strcmp(eq + 1, "hardware") == 0) ? 1 : 0;
         }
     }
     fclose(f);
@@ -285,6 +290,7 @@ static void WriteRes(const ResSettings *s)
     fprintf(out, "width=%d\n",      W[det - 1]);
     fprintf(out, "height=%d\n",     H[det - 1]);
     fprintf(out, "vsync=%d\n",      s->vsync);
+    fprintf(out, "renderer=%s\n",   s->rave ? "rave" : "software");
     fclose(out);
 }
 
@@ -322,6 +328,8 @@ static void SetRadioGroup(DialogPtr d, short first, short last, short selected)
 #define kDsDetail1   13   /* ..18 for detail 1..6 (item = 12 + detail) */
 #define kDsDetail6   18
 #define kDsVsync     19
+#define kDsRendSoft  21   /* [20] is the "3D Renderer:" label */
+#define kDsRendRave  22
 
 static void DoDisplaySettings(void)
 {
@@ -349,6 +357,7 @@ static void DoDisplaySettings(void)
     detailItem = (short)(12 + (s.detail < 1 ? 1 : (s.detail > 6 ? 6 : s.detail)));
     SetRadioGroup(d, kDsDetail1, kDsDetail6, detailItem);
     SetDItemValue(d, kDsVsync, (short)(s.vsync ? 1 : 0));
+    SetRadioGroup(d, kDsRendSoft, kDsRendRave, s.rave ? kDsRendRave : kDsRendSoft);
 
     ShowWindow(GetDialogWindow(d));
 
@@ -366,6 +375,7 @@ static void DoDisplaySettings(void)
             for (i = kDsDetail1; i <= kDsDetail6; i++)
                 if (GetDItemValue(d, i)) { s.detail = i - 12; break; }
             s.vsync = GetDItemValue(d, kDsVsync) ? 1 : 0;
+            s.rave = GetDItemValue(d, kDsRendRave) ? 1 : 0;
             WriteRes(&s);
             done = true;
         } else if (item == kDsCancel) {
@@ -378,6 +388,8 @@ static void DoDisplaySettings(void)
             SetRadioGroup(d, kDsDetail1, kDsDetail6, item);
         } else if (item == kDsVsync) {
             SetDItemValue(d, kDsVsync, (short)(GetDItemValue(d, kDsVsync) ? 0 : 1));
+        } else if (item >= kDsRendSoft && item <= kDsRendRave) {
+            SetRadioGroup(d, kDsRendSoft, kDsRendRave, item);
         }
     }
     DisposeDialog(d);

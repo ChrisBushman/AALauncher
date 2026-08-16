@@ -59,7 +59,7 @@ resource 'vers' (1) {
 
 /* ---- Display Settings dialog (writes resolution.ini) -------------------- */
 resource 'DLOG' (129) {
-    {80, 80, 80 + 300, 80 + 360},
+    {80, 80, 80 + 340, 80 + 360},
     movableDBoxProc, invisible, goAway, 0x0,
     129,
     "Display Settings",
@@ -68,8 +68,8 @@ resource 'DLOG' (129) {
 
 resource 'DITL' (129) {
     {   /* Mac Rect order is {top, left, bottom, right} */
-        /* [1] OK */          {262, 280, 286, 345}, Button { enabled, "OK" };
-        /* [2] Cancel */      {262, 195, 286, 265}, Button { enabled, "Cancel" };
+        /* [1] OK */          {302, 280, 326, 345}, Button { enabled, "OK" };
+        /* [2] Cancel */      {302, 195, 326, 265}, Button { enabled, "Cancel" };
         /* [3] Display: */    {10, 12, 26, 200},    StaticText { disabled, "Display:" };
         /* [4] Windowed */    {28, 20, 44, 150},    RadioButton { enabled, "Windowed" };
         /* [5] Fullscreen */  {28, 160, 44, 300},   RadioButton { enabled, "Fullscreen" };
@@ -87,7 +87,10 @@ resource 'DITL' (129) {
         /* [17] 5 */          {148, 220, 164, 340}, RadioButton { enabled, "5" };
         /* [18] 6 */          {166, 220, 182, 340}, RadioButton { enabled, "6 (sharpest)" };
         /* [19] vsync */      {190, 20, 206, 340},  CheckBox { enabled, "Vertical sync (caps FPS to refresh rate)" };
-        /* [20] note */       {212, 12, 244, 340},  StaticText { disabled, "Applied next time you start a game." };
+        /* [20] Renderer: */  {214, 12, 230, 200},  StaticText { disabled, "3D Renderer:" };
+        /* [21] Software */   {232, 20, 248, 170},  RadioButton { enabled, "Software" };
+        /* [22] Hardware */   {232, 180, 248, 345}, RadioButton { enabled, "Hardware (RAVE)" };
+        /* [23] note */       {258, 12, 290, 340},  StaticText { disabled, "Applied next time you start a game." };
     }
 };
 
