@@ -53,8 +53,8 @@
         NSView *detailContent = [detailBox contentView];
         NSString *detailLabels[6] = {
             @"1 (fastest, 640x480)",
-            @"2 (1024x768)",
-            @"3 (1280x960)",
+            @"2 (800x600)",
+            @"3 (1024x768)",
             @"4 (1280x960)",
             @"5 (1280x960)",
             @"6 (sharpest, 1280x960)",
@@ -230,13 +230,13 @@
         }
     }
 
-    /* Window size tier per detail level -- capped at the level-3 size for
+    /* Window size tier per detail level -- capped at the level-4 size for
        levels 4-6 rather than continuing to grow the window: beyond that
        point higher detail is about render sharpness, not needing an even
        bigger window. All 4:3, matching resolution.ini's own default
        aspect. */
-    static const int widths[6]  = { 640, 1024, 1280, 1280, 1280, 1280 };
-    static const int heights[6] = { 480,  768,  960,  960,  960,  960 };
+    static const int widths[6]  = { 640, 800, 1024, 1280, 1280, 1280 };
+    static const int heights[6] = { 480, 600,  768,  960,  960,  960 };
     int width = widths[detail - 1];
     int height = heights[detail - 1];
 

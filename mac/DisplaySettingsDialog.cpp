@@ -55,8 +55,8 @@ DisplaySettingsDialog::DisplaySettingsDialog(const QString &aaBinaryPath, QWidge
     QVBoxLayout *detailLayout = new QVBoxLayout(detailGroup);
     static const char *kDetailLabels[6] = {
         "1 (fastest, 640x480)",
-        "2 (1024x768)",
-        "3 (1280x960)",
+        "2 (800x600)",
+        "3 (1024x768)",
         "4 (1280x960)",
         "5 (1280x960)",
         "6 (sharpest, 1280x960)",
@@ -187,8 +187,8 @@ void DisplaySettingsDialog::saveToIni()
     // point higher detail is about render sharpness, not needing an even
     // bigger window. All 4:3, matching resolution.ini's own default
     // aspect.
-    static const int kWidths[6]  = { 640, 1024, 1280, 1280, 1280, 1280 };
-    static const int kHeights[6] = { 480,  768,  960,  960,  960,  960 };
+    static const int kWidths[6]  = { 640, 800, 1024, 1280, 1280, 1280 };
+    static const int kHeights[6] = { 480, 600,  768,  960,  960,  960 };
     int width = kWidths[detail - 1];
     int height = kHeights[detail - 1];
 

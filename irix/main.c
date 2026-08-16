@@ -649,8 +649,8 @@ static void SaveDisplaySettingsToIni(void)
     int fullscreen = (int)(long)XawToggleGetCurrent(G_dispWindowedToggle);
     int bpp = (int)(long)XawToggleGetCurrent(G_dispBppToggle[0]);
     int detail = (int)(long)XawToggleGetCurrent(G_dispDetailToggle[0]);
-    static const int widths[6]  = { 640, 1024, 1280, 1280, 1280, 1280 };
-    static const int heights[6] = { 480,  768,  960,  960,  960,  960 };
+    static const int widths[6]  = { 640, 800, 1024, 1280, 1280, 1280 };
+    static const int heights[6] = { 480, 600,  768,  960,  960,  960 };
     int width, height;
     char *path, *tmpPath;
     FILE *inFp, *outFp;
@@ -720,7 +720,7 @@ static void DisplaySettingsCallback(Widget w, XtPointer clientData, XtPointer ca
         static const char *bppLabels[5] = { "Auto (recommended)", "8-bit", "16-bit", "24-bit", "32-bit" };
         static const int bppValues[5] = { 0, 8, 16, 24, 32 };
         static const char *detailLabels[6] = {
-            "1 (fastest, 640x480)", "2 (1024x768)", "3 (1280x960)",
+            "1 (fastest, 640x480)", "2 (800x600)", "3 (1024x768)",
             "4 (1280x960)", "5 (1280x960)", "6 (sharpest, 1280x960)",
         };
 

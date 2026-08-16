@@ -272,8 +272,8 @@ static void ApplyDisplaySettingsToIni(HWND hwnd)
        needing an even bigger window, and this stays within what
        RESSCALE's own resolution fallback ladder (1024x768/800x600/
        640x480) actually covers if the requested size isn't available. */
-    static const int widthValues[6]  = { 640, 1024, 1280, 1280, 1280, 1280 };
-    static const int heightValues[6] = { 480,  768,  960,  960,  960,  960 };
+    static const int widthValues[6]  = { 640, 800, 1024, 1280, 1280, 1280 };
+    static const int heightValues[6] = { 480, 600,  768,  960,  960,  960 };
     int fullscreen = GetCheckedInRange(hwnd, ID_RADIO_WINDOWED, ID_RADIO_FULLSCREEN, 1);
     int bppIdx     = GetCheckedInRange(hwnd, ID_RADIO_BPP_AUTO, ID_RADIO_BPP_32, 0);
     int detailIdx  = GetCheckedInRange(hwnd, ID_RADIO_DETAIL_1, ID_RADIO_DETAIL_6, 1);
@@ -427,10 +427,10 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     CreateWindowExA(0, "BUTTON", "1 (fastest, 640x480)",
         WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_RADIOBUTTON, 20, 233, 280, 20,
         hwnd, (HMENU)ID_RADIO_DETAIL_1, hInstance, NULL);
-    CreateWindowExA(0, "BUTTON", "2 (1024x768)",
+    CreateWindowExA(0, "BUTTON", "2 (800x600)",
         WS_CHILD | WS_VISIBLE | BS_RADIOBUTTON, 20, 254, 280, 20,
         hwnd, (HMENU)ID_RADIO_DETAIL_2, hInstance, NULL);
-    CreateWindowExA(0, "BUTTON", "3 (1280x960)",
+    CreateWindowExA(0, "BUTTON", "3 (1024x768)",
         WS_CHILD | WS_VISIBLE | BS_RADIOBUTTON, 20, 275, 280, 20,
         hwnd, (HMENU)ID_RADIO_DETAIL_3, hInstance, NULL);
     CreateWindowExA(0, "BUTTON", "4 (1280x960)",
